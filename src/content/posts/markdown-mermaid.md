@@ -1,12 +1,20 @@
 ---
+draft: true
 title: Markdown Mermaid 图表
-published: 1970-01-01
-pinned: false
-description: 一个包含 Mermaid 的 Markdown 博客文章简单示例。
-tags: [Markdown, 博客, Mermaid, Firefly]
-category: 文章示例
 slug: markdown-mermaid
+published: 1970-01-01
+updated: ''
+description: 一个包含 Mermaid 的 Markdown 博客文章简单示例。
+tags:
+  - Markdown
+  - 博客
+  - Mermaid
+  - Firefly
+category: 文章示例
+author: ''
+pinned: false
 ---
+
 ## Markdown 中 Mermaid 图表完整指南
 
 本文演示如何在 Markdown 文档中使用 Mermaid 创建各种复杂图表，包括流程图、时序图、ER 图、类图、状态图、XY 图、甘特图、思维导图等。
