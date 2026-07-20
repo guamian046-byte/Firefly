@@ -12,8 +12,8 @@ backend:
     uploadMedia: 'content: upload "{{path}}"'
     deleteMedia: 'content: delete "{{path}}"'
 
-media_folder: src/content/posts/images
-public_folder: ./images
+media_folder: public/assets/posts
+public_folder: /assets/posts
 
 collections:
   - name: posts
