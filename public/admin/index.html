@@ -5,8 +5,25 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="robots" content="noindex, nofollow" />
 		<title>Firefly 博客管理</title>
+		<style>
+			#bulk-visibility-link {
+				position: fixed;
+				left: 1.25rem;
+				bottom: 1.25rem;
+				z-index: 99999;
+				padding: 0.7rem 1rem;
+				border-radius: 0.75rem;
+				background: #1769aa;
+				color: #fff;
+				font: 600 0.9rem/1 system-ui, sans-serif;
+				text-decoration: none;
+				box-shadow: 0 0.35rem 1rem rgb(0 0 0 / 18%);
+			}
+			#bulk-visibility-link:hover { background: #12568c; }
+		</style>
 	</head>
 	<body>
 		<script src="https://unpkg.com/@sveltia/cms/dist/sveltia-cms.js"></script>
+		<a id="bulk-visibility-link" href="/admin/bulk.html">批量隐藏 / 公开</a>
 	</body>
 </html>
