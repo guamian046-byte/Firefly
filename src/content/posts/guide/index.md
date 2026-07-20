@@ -1,4 +1,5 @@
 ---
+draft: true
 title: Firefly 简单使用指南
 published: 1970-01-02
 pinned: true
