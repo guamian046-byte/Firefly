@@ -33,6 +33,11 @@ collections:
         field: published
         direction: descending
     fields:
+      - label: 设为私密
+        name: draft
+        widget: boolean
+        default: false
+        hint: 关闭表示公开，所有访客都能查看；开启表示私密，不会发布到网站，只能在此后台查看和编辑。
       - label: 文章标题
         name: title
         widget: string
@@ -92,10 +97,6 @@ collections:
           - { label: 日本語, value: ja }
           - { label: 한국어, value: ko }
           - { label: Русский, value: ru }
-      - label: 草稿
-        name: draft
-        widget: boolean
-        default: false
       - label: 置顶
         name: pinned
         widget: boolean
@@ -108,22 +109,18 @@ collections:
         name: sourceLink
         widget: string
         required: false
-      - label: 许可证名称
-        name: licenseName
-        widget: string
-        required: false
-      - label: 许可证链接
-        name: licenseUrl
-        widget: string
-        required: false
-      - label: 访问密码
-        name: password
-        widget: string
-        required: false
-      - label: 密码提示
-        name: passwordHint
-        widget: string
-        required: false
+      - name: licenseName
+        widget: hidden
+        default: ""
+      - name: licenseUrl
+        widget: hidden
+        default: ""
+      - name: password
+        widget: hidden
+        default: ""
+      - name: passwordHint
+        widget: hidden
+        default: ""
       - label: 正文
         name: body
         widget: markdown
