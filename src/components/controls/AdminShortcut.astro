@@ -1,0 +1,17 @@
+---
+import FloatingButton from "@/components/common/FloatingButton.astro";
+import { url } from "@/utils/url-utils";
+---
+
+<FloatingButton
+	id="admin-shortcut-btn"
+	icon="material-symbols:edit-square-outline-rounded"
+	ariaLabel="写博客 / 管理文章"
+	onclick="openBlogAdmin()"
+/>
+
+<script is:inline define:vars={{ adminUrl: url("/admin/") }}>
+	window.openBlogAdmin = function () {
+		window.location.href = adminUrl;
+	};
+</script>

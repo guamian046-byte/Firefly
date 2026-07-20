@@ -1,5 +1,6 @@
 ---
 import type { MarkdownHeading } from "astro";
+import AdminShortcut from "./AdminShortcut.astro";
 import BackToComment from "./BackToComment.astro";
 import BackToHome from "./BackToHome.astro";
 import BackToTop from "./BackToTop.astro";
@@ -14,6 +15,7 @@ const { headings, encrypted } = Astro.props;
 ---
 
 <div class="floating-controls-container">
+  <AdminShortcut />
   <FloatingTOC headings={headings ?? []} encrypted={encrypted} />
   <BackToComment />
   <BackToHome />
