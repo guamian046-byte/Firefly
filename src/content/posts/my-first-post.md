@@ -1,15 +1,15 @@
 ---
-title: 你好我来
+draft: false
+title: 这是第一则博客
 slug: my-first-post
 published: 2026-07-20
 updated: 2026-07-20
-description: 没啥
+description: 你好呀
 image: ''
 tags: []
 category: 文章示例
 author: guamian
 lang: ''
-draft: false
 pinned: false
 comment: true
 sourceLink: ''
@@ -19,4 +19,4 @@ password: ''
 passwordHint: ''
 ---
 
-你好呀
+ok也是做好了
