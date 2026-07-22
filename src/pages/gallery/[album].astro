@@ -6,7 +6,11 @@ import { galleryConfig, siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
-import { getAlbumCover, scanAlbumPhotos } from "@/utils/gallery-utils";
+import {
+	getAlbumCover,
+	getAlbumPhotos,
+	loadGalleryAlbums,
+} from "@/utils/gallery-utils";
 import { getLqipProps } from "@/utils/lqip-utils";
 import { url } from "@/utils/url-utils";
 
@@ -16,19 +20,20 @@ if (!siteConfig.pages.gallery) {
 }
 
 export function getStaticPaths() {
-	return galleryConfig.albums.map((album) => ({
+	return loadGalleryAlbums(galleryConfig.albums).map((album) => ({
 		params: { album: album.id },
 	}));
 }
 
 const { album: albumId } = Astro.params;
-const albumMeta = galleryConfig.albums.find((a) => a.id === albumId);
+const galleryAlbums = loadGalleryAlbums(galleryConfig.albums);
+const albumMeta = galleryAlbums.find((a) => a.id === albumId);
 
 if (!albumMeta) {
 	return Astro.redirect("/404/");
 }
 
-const photos = scanAlbumPhotos(albumMeta.id);
+const photos = getAlbumPhotos(albumMeta);
 const cover = getAlbumCover(albumMeta, photos);
 const columnWidth = galleryConfig.columnWidth || 240;
 
@@ -57,6 +62,14 @@ const coverLqipProps = cover
         >
           <Icon is:inline name="material-symbols:arrow-back" class="text-base" />
           {i18n(I18nKey.galleryBackToAlbums)}
+        </a>
+        <a
+          href={url(`/admin/#/collections/gallery/entries/${albumMeta.id}`)}
+          target="_blank"
+          class="absolute top-4 right-4 inline-flex items-center gap-1.5 text-sm text-white/90 hover:text-white bg-black/30 hover:bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-lg transition-colors"
+        >
+          <Icon is:inline name="material-symbols:edit-square-outline" class="text-base" />
+          编辑此相册
         </a>
         <!-- 封面上的信息 -->
         <div class="absolute bottom-0 left-0 right-0 p-6">
@@ -99,13 +112,23 @@ const coverLqipProps = cover
       </div>
     ) : (
       <div class="card-base px-6 py-4">
-        <a
-          href={url("/gallery/")}
-          class="inline-flex items-center gap-1 text-sm text-(--primary) hover:underline mb-3"
-        >
-          <Icon is:inline name="material-symbols:arrow-back" class="text-base" />
-          {i18n(I18nKey.galleryBackToAlbums)}
-        </a>
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <a
+            href={url("/gallery/")}
+            class="inline-flex items-center gap-1 text-sm text-(--primary) hover:underline"
+          >
+            <Icon is:inline name="material-symbols:arrow-back" class="text-base" />
+            {i18n(I18nKey.galleryBackToAlbums)}
+          </a>
+          <a
+            href={url(`/admin/#/collections/gallery/entries/${albumMeta.id}`)}
+            target="_blank"
+            class="btn-regular inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium"
+          >
+            <Icon is:inline name="material-symbols:edit-square-outline" class="text-base" />
+            编辑此相册
+          </a>
+        </div>
         <div class="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">
           {albumMeta.name}
         </div>

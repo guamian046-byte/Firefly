@@ -19,6 +19,49 @@ function withBase(assetPath: string): string {
 }
 
 /**
+ * 从后台管理的数据目录读取相册；没有数据文件时回退到旧配置。
+ */
+export function loadGalleryAlbums(
+	fallback: GalleryAlbum[] = [],
+): GalleryAlbum[] {
+	const dataDir = path.join(process.cwd(), "src", "data", "gallery");
+	if (!fs.existsSync(dataDir)) return fallback;
+
+	const albums = fs
+		.readdirSync(dataDir)
+		.filter((file) => file.endsWith(".json"))
+		.map((file) => {
+			try {
+				const data = JSON.parse(
+					fs.readFileSync(path.join(dataDir, file), "utf-8"),
+				) as GalleryAlbum;
+				return data?.id && data?.name ? data : null;
+			} catch (error) {
+				console.warn(`相册数据读取失败: ${file}`, error);
+				return null;
+			}
+		})
+		.filter((album): album is GalleryAlbum => album !== null)
+		.sort(
+			(a, b) =>
+				(a.order ?? 999) - (b.order ?? 999) ||
+				(b.date || "").localeCompare(a.date || ""),
+		);
+
+	return albums.length > 0 ? albums : fallback;
+}
+
+/**
+ * 优先使用后台维护的图片列表，并兼容旧相册目录扫描方式。
+ */
+export function getAlbumPhotos(album: GalleryAlbum): string[] {
+	if (Array.isArray(album.photos)) {
+		return album.photos.filter(Boolean).map(withBase);
+	}
+	return scanAlbumPhotos(album.id);
+}
+
+/**
  * 扫描相册目录中的所有图片文件
  */
 export function scanAlbumPhotos(albumId: string): string[] {

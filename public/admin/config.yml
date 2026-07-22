@@ -124,3 +124,97 @@ collections:
       - label: 正文
         name: body
         widget: markdown
+  - name: gallery
+    label: 相册管理
+    label_singular: 相册
+    folder: src/data/gallery
+    create: true
+    delete: true
+    extension: json
+    format: json
+    identifier_field: id
+    summary: '{{name}} · {{date}}'
+    slug: '{{fields.id}}'
+    sortable_fields:
+      fields: [order, date, name]
+      default:
+        field: order
+        direction: ascending
+    fields:
+      - label: 相册名称
+        name: name
+        widget: string
+      - label: URL 路径
+        name: id
+        widget: string
+        hint: 只填写小写英文、数字和连字符，例如 summer-2026；创建后不建议修改。
+        pattern: ['^[a-z0-9]+(?:-[a-z0-9]+)*$', 只能使用小写英文、数字和连字符]
+      - label: 显示顺序
+        name: order
+        widget: number
+        value_type: int
+        default: 100
+        min: 0
+        hint: 数字越小越靠前。
+      - label: 相册描述
+        name: description
+        widget: text
+        required: false
+      - label: 日期
+        name: date
+        widget: datetime
+        format: YYYY-MM-DD
+        date_format: YYYY-MM-DD
+        time_format: false
+        required: false
+      - label: 地点
+        name: location
+        widget: string
+        required: false
+      - label: 标签
+        name: tags
+        widget: list
+        required: false
+        default: []
+        allow_add: true
+        allow_remove: true
+        allow_reorder: true
+        field:
+          label: 标签
+          name: tag
+          widget: string
+      - label: 封面图片
+        name: cover
+        widget: image
+        required: false
+        choose_url: true
+        media_folder: /public/gallery/uploads
+        public_folder: /gallery/uploads
+      - label: 相册图片
+        name: photos
+        widget: list
+        required: false
+        default: []
+        allow_add: true
+        allow_remove: true
+        allow_reorder: true
+        collapsed: true
+        field:
+          label: 图片
+          name: photo
+          widget: image
+          choose_url: true
+          media_folder: /public/gallery/uploads
+          public_folder: /gallery/uploads
+          media_library:
+            config:
+              max_file_size: 10485760
+      - label: 访问密码
+        name: password
+        widget: string
+        required: false
+        hint: 留空表示公开相册。
+      - label: 密码提示
+        name: passwordHint
+        widget: string
+        required: false
