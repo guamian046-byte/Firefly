@@ -20,13 +20,13 @@ if (!siteConfig.pages.gallery) {
 }
 
 export function getStaticPaths() {
-	return loadGalleryAlbums(galleryConfig.albums).map((album) => ({
+	return loadGalleryAlbums().map((album) => ({
 		params: { album: album.id },
 	}));
 }
 
 const { album: albumId } = Astro.params;
-const galleryAlbums = loadGalleryAlbums(galleryConfig.albums);
+const galleryAlbums = loadGalleryAlbums();
 const albumMeta = galleryAlbums.find((a) => a.id === albumId);
 
 if (!albumMeta) {

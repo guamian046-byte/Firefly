@@ -19,13 +19,11 @@ function withBase(assetPath: string): string {
 }
 
 /**
- * 从后台管理的数据目录读取相册；没有数据文件时回退到旧配置。
+ * 从后台管理的数据目录读取相册；目录不存在或没有数据时返回空列表。
  */
-export function loadGalleryAlbums(
-	fallback: GalleryAlbum[] = [],
-): GalleryAlbum[] {
+export function loadGalleryAlbums(): GalleryAlbum[] {
 	const dataDir = path.join(process.cwd(), "src", "data", "gallery");
-	if (!fs.existsSync(dataDir)) return fallback;
+	if (!fs.existsSync(dataDir)) return [];
 
 	const albums = fs
 		.readdirSync(dataDir)
@@ -48,7 +46,7 @@ export function loadGalleryAlbums(
 				(b.date || "").localeCompare(a.date || ""),
 		);
 
-	return albums.length > 0 ? albums : fallback;
+	return albums;
 }
 
 /**
