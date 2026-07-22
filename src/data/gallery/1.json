@@ -1,0 +1,15 @@
+{
+  "name": "小爱同学",
+  "id": "1",
+  "order": 100,
+  "description": "",
+  "date": "",
+  "location": "",
+  "tags": [],
+  "cover": "/gallery/uploads/76be2ec6f05b2087ce1b3b2ea60b65a4.jpg",
+  "photos": [
+    "/gallery/uploads/76be2ec6f05b2087ce1b3b2ea60b65a4.jpg"
+  ],
+  "password": "",
+  "passwordHint": ""
+}
