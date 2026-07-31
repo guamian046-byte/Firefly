@@ -70,7 +70,10 @@ jobs:
           revision="$1"
           source_dir="/var/www/guamian/source"
           if [ ! -d "$source_dir/.git" ]; then
-            git clone https://github.com/guamian046-byte/Firefly.git "$source_dir"
+            if [ -e "$source_dir" ]; then
+              mv "$source_dir" "$source_dir.incomplete.$(date +%Y%m%d%H%M%S)"
+            fi
+            git clone --depth=1 --no-tags https://github.com/guamian046-byte/Firefly.git "$source_dir"
           fi
           git -C "$source_dir" fetch --depth=1 origin "$revision"
           git -C "$source_dir" checkout --force --detach FETCH_HEAD
