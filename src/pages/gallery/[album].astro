@@ -1,188 +1,132 @@
 ---
+export const prerender = false;
+
+import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { Icon } from "astro-icon/components";
-import EncryptedContent from "@/components/features/EncryptedContent.astro";
 import PhotoCard from "@/components/pages/gallery/PhotoCard.astro";
-import { galleryConfig, siteConfig } from "@/config";
-import I18nKey from "@/i18n/i18nKey";
-import { i18n } from "@/i18n/translation";
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
-import {
-	getAlbumCover,
-	getAlbumPhotos,
-	loadGalleryAlbums,
-} from "@/utils/gallery-utils";
-import { getLqipProps } from "@/utils/lqip-utils";
-import { url } from "@/utils/url-utils";
+import { assertSameOrigin, getCurrentUser } from "@/lib/server/auth";
+import { query } from "@/lib/server/db";
 
-// 检查页面是否启用
-if (!siteConfig.pages.gallery) {
-	return Astro.redirect("/404/");
+const slug = Astro.params.album || "";
+const user = await getCurrentUser(Astro.cookies);
+const uploadRoot =
+	process.env.GALLERY_UPLOAD_DIR || "/var/www/guamian/uploads/gallery";
+let notice = "";
+let error = "";
+let album = (
+	await query<{
+		id: string;
+		slug: string;
+		name: string;
+		description: string;
+		location: string;
+		album_date: string | null;
+		tags: string;
+	}>(
+		"SELECT id::text, slug, name, description, location, album_date::text, tags FROM gallery_albums WHERE slug = $1",
+		[slug],
+	)
+).rows[0];
+if (!album) return new Response("相册不存在", { status: 404 });
+
+if (Astro.request.method === "POST") {
+	try {
+		assertSameOrigin(Astro.request);
+		if (!user)
+			return Astro.redirect(
+				`/login/?returnTo=${encodeURIComponent(Astro.url.pathname)}`,
+			);
+		const form = await Astro.request.formData();
+		const action = String(form.get("action") || "");
+		if (action === "update") {
+			await query(
+				"UPDATE gallery_albums SET name = $1, description = $2, location = $3, album_date = NULLIF($4, '')::date, tags = $5, updated_at = NOW() WHERE id = $6",
+				[
+					String(form.get("name") || "")
+						.trim()
+						.slice(0, 100),
+					String(form.get("description") || "").slice(0, 500),
+					String(form.get("location") || "").slice(0, 120),
+					String(form.get("date") || ""),
+					String(form.get("tags") || "").slice(0, 500),
+					album.id,
+				],
+			);
+			notice = "相册资料已更新";
+		} else if (action === "upload") {
+			const files = form
+				.getAll("photos")
+				.filter((item): item is File => item instanceof File && item.size > 0);
+			if (!files.length) throw new Error("请选择图片");
+			await fs.mkdir(uploadRoot, { recursive: true });
+			for (const file of files.slice(0, 20)) {
+				if (
+					!/^image\/(jpeg|png|webp|gif|avif)$/i.test(file.type) ||
+					file.size > 8 * 1024 * 1024
+				)
+					throw new Error("仅支持 JPG、PNG、WebP、GIF、AVIF，单张不超过 8MB");
+				const id = randomUUID();
+				await fs.writeFile(
+					path.join(uploadRoot, id),
+					Buffer.from(await file.arrayBuffer()),
+					{ flag: "wx" },
+				);
+				await query(
+					"INSERT INTO gallery_photos (id, album_id, uploaded_by, file_name, content_type, file_size) VALUES ($1, $2, $3, $4, $5, $6)",
+					[
+						id,
+						album.id,
+						user.id,
+						file.name.slice(0, 255),
+						file.type,
+						file.size,
+					],
+				);
+			}
+			notice = `成功上传 ${files.length} 张图片`;
+		} else if (action === "delete-photo") {
+			const photoId = String(form.get("photoId") || "");
+			await query(
+				"DELETE FROM gallery_photos WHERE id = $1 AND album_id = $2",
+				[photoId, album.id],
+			);
+			await fs.rm(path.join(uploadRoot, photoId), { force: true });
+			notice = "图片已删除";
+		}
+		album = (
+			await query<{
+				id: string;
+				slug: string;
+				name: string;
+				description: string;
+				location: string;
+				album_date: string | null;
+				tags: string;
+			}>(
+				"SELECT id::text, slug, name, description, location, album_date::text, tags FROM gallery_albums WHERE id = $1",
+				[album.id],
+			)
+		).rows[0];
+	} catch (cause) {
+		error = cause instanceof Error ? cause.message : "操作失败";
+	}
 }
-
-export function getStaticPaths() {
-	return loadGalleryAlbums().map((album) => ({
-		params: { album: album.id },
-	}));
-}
-
-const { album: albumId } = Astro.params;
-const galleryAlbums = loadGalleryAlbums();
-const albumMeta = galleryAlbums.find((a) => a.id === albumId);
-
-if (!albumMeta) {
-	return Astro.redirect("/404/");
-}
-
-const photos = getAlbumPhotos(albumMeta);
-const cover = getAlbumCover(albumMeta, photos);
-const columnWidth = galleryConfig.columnWidth || 240;
-
-// LQIP 渐变占位
-const coverLqipProps = cover
-	? getLqipProps(cover, undefined, true)
-	: { style: "" };
+const photos = await query<{
+	id: string;
+	file_name: string;
+	username: string | null;
+	created_at: Date;
+}>(
+	"SELECT p.id::text, p.file_name, u.username, p.created_at FROM gallery_photos p LEFT JOIN users u ON u.id = p.uploaded_by WHERE p.album_id = $1 ORDER BY p.created_at DESC",
+	[album.id],
+);
 ---
 
-<MainGridLayout title={albumMeta.name} description={albumMeta.description || ""}>
-  <!-- 相册封面横幅 -->
-  <div class="w-full rounded-(--radius-large) overflow-hidden relative">
-    {cover ? (
-      <div class="relative w-full aspect-[3/1] min-h-[200px] max-h-[360px] overflow-hidden">
-        <div class="lqip-placeholder absolute inset-0 pointer-events-none" style={coverLqipProps.style} aria-hidden="true"></div>
-        <img
-          src={cover}
-          alt={albumMeta.name}
-          class="w-full h-full object-cover opacity-0 transition-opacity duration-500 ease-out"
-        />
-        <div class="absolute inset-0 bg-linear-to-t from-black/70 via-black/30 to-transparent" />
-        <!-- 返回按钮 -->
-        <a
-          href={url("/gallery/")}
-          class="absolute top-4 left-4 inline-flex items-center gap-1.5 text-sm text-white/90 hover:text-white bg-black/30 hover:bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <Icon is:inline name="material-symbols:arrow-back" class="text-base" />
-          {i18n(I18nKey.galleryBackToAlbums)}
-        </a>
-        <a
-          href={url(`/admin/#/collections/gallery/entries/${albumMeta.id}`)}
-          target="_blank"
-          class="absolute top-4 right-4 inline-flex items-center gap-1.5 text-sm text-white/90 hover:text-white bg-black/30 hover:bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <Icon is:inline name="material-symbols:edit-square-outline" class="text-base" />
-          编辑此相册
-        </a>
-        <!-- 封面上的信息 -->
-        <div class="absolute bottom-0 left-0 right-0 p-6">
-          <div class="text-2xl sm:text-3xl font-bold text-white mb-2 drop-shadow-lg">
-            {albumMeta.name}
-          </div>
-          {albumMeta.description && (
-            <p class="text-sm text-white/75 leading-relaxed mb-2 max-w-2xl line-clamp-2">
-              {albumMeta.description}
-            </p>
-          )}
-          <div class="flex items-center gap-4 text-sm text-white/80 flex-wrap">
-            {albumMeta.date && (
-              <span class="inline-flex items-center gap-1">
-                <Icon is:inline name="material-symbols:calendar-today" class="text-sm" />
-                {albumMeta.date}
-              </span>
-            )}
-            {albumMeta.location && (
-              <span class="inline-flex items-center gap-1">
-                <Icon is:inline name="material-symbols:location-on" class="text-sm" />
-                {albumMeta.location}
-              </span>
-            )}
-            <span class="inline-flex items-center gap-1">
-              <Icon is:inline name="material-symbols:photo-library" class="text-sm" />
-              {photos.length} {i18n(I18nKey.galleryPhotos)}
-            </span>
-          </div>
-          {albumMeta.tags && albumMeta.tags.length > 0 && (
-            <div class="flex flex-wrap gap-1.5 mt-2.5">
-              {albumMeta.tags.map((tag) => (
-                <span class="text-xs px-2 py-0.5 rounded bg-white/20 text-white/90 backdrop-blur-sm">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    ) : (
-      <div class="card-base px-6 py-4">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <a
-            href={url("/gallery/")}
-            class="inline-flex items-center gap-1 text-sm text-(--primary) hover:underline"
-          >
-            <Icon is:inline name="material-symbols:arrow-back" class="text-base" />
-            {i18n(I18nKey.galleryBackToAlbums)}
-          </a>
-          <a
-            href={url(`/admin/#/collections/gallery/entries/${albumMeta.id}`)}
-            target="_blank"
-            class="btn-regular inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium"
-          >
-            <Icon is:inline name="material-symbols:edit-square-outline" class="text-base" />
-            编辑此相册
-          </a>
-        </div>
-        <div class="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">
-          {albumMeta.name}
-        </div>
-        <div class="flex items-center gap-4 text-sm text-neutral-500 dark:text-neutral-400 mt-2 flex-wrap">
-          {albumMeta.date && (
-            <span class="inline-flex items-center gap-1">
-              <Icon is:inline name="material-symbols:calendar-today" class="text-sm" />
-              {albumMeta.date}
-            </span>
-          )}
-          {albumMeta.location && (
-            <span class="inline-flex items-center gap-1">
-              <Icon is:inline name="material-symbols:location-on" class="text-sm" />
-              {albumMeta.location}
-            </span>
-          )}
-          <span>{photos.length} {i18n(I18nKey.galleryPhotos)}</span>
-        </div>
-      </div>
-    )}
-  </div>
-
-  <!-- 瀑布流照片网格 -->
-  <div class="w-full rounded-(--radius-large) overflow-hidden relative mt-4">
-    <div class="card-base z-10 px-6 py-6 relative w-full">
-      {photos.length > 0 ? (
-        albumMeta.password ? (
-          <EncryptedContent password={albumMeta.password} slug={albumMeta.id} hint={albumMeta.passwordHint}>
-            <div
-              class="gallery-masonry"
-              style={`column-count: 2; column-gap: 0.75rem; --col-width: ${columnWidth}px;`}
-            >
-              {photos.map((photo) => (
-                <PhotoCard src={photo} albumId={albumMeta.id} />
-              ))}
-            </div>
-          </EncryptedContent>
-        ) : (
-          <div
-            class="gallery-masonry"
-            style={`column-count: 2; column-gap: 0.75rem; --col-width: ${columnWidth}px;`}
-          >
-            {photos.map((photo) => (
-              <PhotoCard src={photo} albumId={albumMeta.id} />
-            ))}
-          </div>
-        )
-      ) : (
-        <div class="flex flex-col items-center justify-center py-16 text-neutral-400 dark:text-neutral-500">
-          <Icon is:inline name="material-symbols:photo-library" class="text-6xl mb-4 opacity-50" />
-          <p class="text-lg">{i18n(I18nKey.galleryNoAlbums)}</p>
-        </div>
-      )}
-    </div>
-  </div>
-
+<MainGridLayout title={album.name} description={album.description}>
+	<section class="card-base community-card"><a href="/gallery/" class="community-author-link">← 返回相册</a><h1 class="text-3xl font-bold mt-3">{album.name}</h1><p class="community-muted">{album.description}</p><p class="community-meta mt-2">{album.album_date || ""} {album.location ? `· ${album.location}` : ""} · {photos.rows.length} 张图片</p>{notice && <p class="community-alert mt-4">{notice}</p>}{error && <p class="community-alert error mt-4">{error}</p>}</section>
+	{user && <section class="card-base community-card"><div class="community-grid"><form method="post" enctype="multipart/form-data" class="community-form"><input type="hidden" name="action" value="upload"/><h3 class="community-section-title">上传图片</h3><input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple required/><button class="community-button primary">上传所选图片</button></form><form method="post" class="community-form"><input type="hidden" name="action" value="update"/><h3 class="community-section-title">修改相册资料</h3><label>名称<input name="name" value={album.name} required/></label><label>描述<input name="description" value={album.description}/></label><label>地点<input name="location" value={album.location}/></label><label>日期<input type="date" name="date" value={album.album_date || ""}/></label><label>标签<input name="tags" value={album.tags}/></label><button class="community-button">保存资料</button></form></div></section>}
+	<section class="card-base community-card">{photos.rows.length ? <div class="gallery-masonry" style="column-count:2;column-gap:.75rem">{photos.rows.map((photo) => <div class="break-inside-avoid mb-3"><PhotoCard src={`/api/gallery/photos/${photo.id}`} albumId={album.slug} alt={photo.file_name}/>{user && <form method="post" onsubmit="return confirm('确定删除这张图片吗？')"><input type="hidden" name="action" value="delete-photo"/><input type="hidden" name="photoId" value={photo.id}/><button class="community-button">删除图片</button></form>}</div>)}</div> : <div class="community-muted py-12 text-center"><Icon is:inline name="material-symbols:photo-library" class="text-5xl"/><p>还没有图片</p></div>}</section>
 </MainGridLayout>

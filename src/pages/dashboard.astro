@@ -1,0 +1,63 @@
+---
+export const prerender = false;
+import CommunityLayout from "@layouts/CommunityLayout.astro";
+import { assertSameOrigin, getCurrentUser, isAdmin } from "@/lib/server/auth";
+import { query } from "@/lib/server/db";
+
+const user = await getCurrentUser(Astro.cookies);
+if (!user) return Astro.redirect("/login/");
+let notice = "";
+let error = "";
+if (Astro.request.method === "POST") {
+	try {
+		assertSameOrigin(Astro.request);
+		const form = await Astro.request.formData();
+		const displayName = String(form.get("displayName") || "").trim().slice(0, 60);
+		const bio = String(form.get("bio") || "").trim().slice(0, 500);
+		const website = String(form.get("website") || "").trim().slice(0, 255);
+		if (website && !/^https?:\/\//i.test(website)) throw new Error("个人网站必须以 http:// 或 https:// 开头");
+		await query("UPDATE users SET display_name = $1, bio = $2, website = $3, updated_at = NOW() WHERE id = $4", [displayName, bio, website, user.id]);
+		notice = "个人资料已保存";
+	} catch (cause) {
+		error = cause instanceof Error ? cause.message : "个人资料保存失败";
+	}
+}
+const profile = (await query<{ display_name: string; bio: string; website: string }>(
+	"SELECT display_name, bio, website FROM users WHERE id = $1",
+	[user.id],
+)).rows[0];
+const posts = await query<{ id: string; title: string; status: string; review_note: string; updated_at: Date; slug: string | null }>(
+	"SELECT id::text, title, status, review_note, updated_at, slug FROM community_posts WHERE author_id = $1 ORDER BY updated_at DESC",
+	[user.id],
+);
+const labels: Record<string, string> = { draft: "草稿", pending: "审核中", published: "已发布", rejected: "需修改" };
+---
+<CommunityLayout title={`你好，${user.username}`} description="在这里管理文章、查看审核进度和账号权限。">
+	{notice && <p class="community-alert">{notice}</p>}{error && <p class="community-alert error">{error}</p>}
+	<section class="card-base community-card">
+		<div class="community-actions">
+			<a class="community-button primary" href="/write/">写一篇新文章</a>
+			{isAdmin(user) && <a class="community-button" href="/admin/">进入管理员后台</a>}
+			<form method="post" action="/logout/"><button class="community-button">退出登录</button></form>
+		</div>
+		<p class="community-muted">当前角色：{user.role} · {user.email}</p>
+	</section>
+	<section class="card-base community-card">
+		<h3>公开个人资料</h3>
+		<p class="community-muted">这些内容会显示在你的公开作者主页，邮箱不会公开。</p>
+		<form method="post" class="community-form">
+			<label>显示昵称<input name="displayName" maxlength="60" value={profile?.display_name || ""} placeholder={user.username} /></label>
+			<label>个人简介<textarea name="bio" maxlength="500" rows="5" class="community-short-textarea" placeholder="介绍一下自己和你喜欢写的内容">{profile?.bio || ""}</textarea></label>
+			<label>个人网站<input name="website" maxlength="255" value={profile?.website || ""} placeholder="https://example.com" /></label>
+			<div class="community-actions"><button class="community-button primary">保存个人资料</button><a class="community-button" href={`/members/${encodeURIComponent(user.username)}/`}>查看公开主页</a></div>
+		</form>
+	</section>
+	<section class="card-base community-card">
+		<h3>我的文章</h3>
+		{posts.rows.length === 0 ? <p class="community-muted">还没有文章，从第一篇草稿开始吧。</p> : (
+			<table class="community-table"><thead><tr><th>标题</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead><tbody>
+				{posts.rows.map((post) => <tr><td>{post.title}</td><td>{labels[post.status] ?? post.status}{post.review_note && <small> · {post.review_note}</small>}</td><td>{new Date(post.updated_at).toLocaleDateString("zh-CN")}</td><td><a href={`/write/?id=${post.id}`}>编辑</a>{post.status === "published" && post.slug && <> · <a href={`/articles/${post.slug}/`}>查看</a></>}</td></tr>)}
+			</tbody></table>
+		)}
+	</section>
+</CommunityLayout>

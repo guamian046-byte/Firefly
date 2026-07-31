@@ -12,8 +12,8 @@ import { collectUsedFontCssVars, toPublicPath } from "../src/utils/fontHelper";
 
 // ─── 配置 ───────────────────────────────────────────────
 
-const DIST_DIR = "dist";
-const OUTPUT_DIR = "dist/_astro/fonts";
+const DIST_DIR = "dist/client";
+const OUTPUT_DIR = "dist/client/_astro/fonts";
 
 // ─── 字体配置解析 ────────────────────────────────────────
 

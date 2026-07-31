@@ -1,0 +1,32 @@
+---
+export const prerender = false;
+import CommunityLayout from "@layouts/CommunityLayout.astro";
+import { assertSameOrigin, createSession, getCurrentUser, verifyPassword } from "@/lib/server/auth";
+import { query } from "@/lib/server/db";
+
+if (await getCurrentUser(Astro.cookies)) return Astro.redirect("/dashboard/");
+let error = "";
+if (Astro.request.method === "POST") {
+	try {
+		assertSameOrigin(Astro.request);
+		const form = await Astro.request.formData();
+		const email = String(form.get("email") || "").trim().toLowerCase();
+		const password = String(form.get("password") || "");
+		const result = await query<{ id: string; password_hash: string; active: boolean }>("SELECT id::text, password_hash, active FROM users WHERE email = $1", [email]);
+		const account = result.rows[0];
+		if (!account || !account.active || !(await verifyPassword(password, account.password_hash))) throw new Error("邮箱或密码不正确");
+		await createSession(account.id, Astro.cookies);
+		return Astro.redirect("/dashboard/");
+	} catch (cause) { error = cause instanceof Error ? cause.message : "登录失败"; }
+}
+---
+<CommunityLayout title="登录" description="继续写作、管理草稿和查看审核状态。">
+	<section class="card-base community-card">
+		{error && <p class="community-alert error">{error}</p>}
+		<form method="post" class="community-form">
+			<label>邮箱<input name="email" type="email" autocomplete="email" required /></label>
+			<label>密码<input name="password" type="password" autocomplete="current-password" required /></label>
+			<div class="community-actions"><button class="community-button primary">登录</button><a href="/register/">注册新账号</a></div>
+		</form>
+	</section>
+</CommunityLayout>

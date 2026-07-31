@@ -33,8 +33,8 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		],
 	});
 
-	// 留言板
-	links.push(LinkPresets.Guestbook);
+	// 社区创作中心
+	links.push(LinkPresets.Community);
 
 	// 我的及其子菜单
 	links.push({
@@ -133,6 +133,11 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		url: "/guestbook/",
 		icon: "material-symbols:chat",
 		pageKey: "guestbook",
+	},
+	Community: {
+		name: "创作中心",
+		url: "/write/",
+		icon: "material-symbols:edit-square-outline-rounded",
 	},
 	About: {
 		name: "关于我",

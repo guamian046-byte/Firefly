@@ -1,0 +1,37 @@
+---
+import { Icon } from "astro-icon/components";
+
+interface Props {
+	title: string;
+	slug: string;
+	excerpt: string;
+	username: string;
+	published: Date;
+	style?: string;
+}
+
+const { title, slug, excerpt, username, published, style } = Astro.props;
+const publishedLabel = new Date(published).toLocaleDateString("zh-CN");
+---
+
+<article class="post-card-wrapper no-cover card-base post-card-item onload-animation flex w-full rounded-(--radius-large) overflow-hidden relative" style={style}>
+	<div class="post-card-content pl-4 md:pl-9 pr-18 pt-4 md:pt-7 pb-4 md:pb-7 relative flex flex-col h-full w-full">
+		<a href={`/articles/${slug}/`} class="post-card-title transition group block font-bold mb-3 text-2xl text-90 hover:text-(--primary)">
+			{title}
+		</a>
+		<div class="post-meta-root flex flex-wrap text-neutral-500 dark:text-neutral-400 items-center gap-4 mb-4">
+			<a href={`/members/${encodeURIComponent(username)}/`} class="flex items-center gap-1.5 text-sm font-medium hover:text-(--primary)"><Icon name="material-symbols:person-outline-rounded" class="text-xl" />作者：{username}</a>
+			<span class="flex items-center gap-1.5 text-sm font-medium"><Icon name="material-symbols:calendar-today-outline-rounded" class="text-xl" />{publishedLabel}</span>
+		</div>
+		<p class="transition text-75 grow">{excerpt || "点击阅读完整文章"}</p>
+	</div>
+	<a href={`/articles/${slug}/`} aria-label={`阅读 ${title}`} class="post-card-enter-btn flex btn-regular w-13 absolute right-3 top-3 bottom-3 rounded-xl bg-(--enter-btn-bg) hover:bg-(--enter-btn-bg-hover)">
+		<Icon name="material-symbols:chevron-right-rounded" class="transition text-(--primary) text-4xl mx-auto" />
+	</a>
+</article>
+
+<style>
+	:global(.grid-mode) .post-card-wrapper { height: 100%; }
+	:global(.grid-mode) .post-card-content { padding: 1rem 4.5rem 1rem 1rem !important; }
+	:global(.grid-mode) .post-card-title { font-size: 1.35rem !important; line-height: 1.75rem !important; }
+</style>

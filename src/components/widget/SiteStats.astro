@@ -75,6 +75,7 @@ const stats = [
 		icon: "material-symbols:article-outline",
 		label: i18n(I18nKey.siteStatsPostCount),
 		value: posts.length,
+		id: "post-count",
 	},
 	{
 		icon: "material-symbols:folder-outline",
@@ -178,11 +179,21 @@ const stats = [
     }
   }
 
+	async function updatePublishedCount() {
+		try {
+			const response = await fetch('/api/allPostMeta.json');
+			const posts = await response.json();
+			document.querySelectorAll('[data-stat-id="post-count"]').forEach((element) => { element.textContent = String(posts.length); });
+		} catch {}
+	}
+
   // 页面加载时更新
   updateDynamicStats();
+	updatePublishedCount();
 
   // 页面切换时重新更新
   document.addEventListener("swup:contentReplaced", () => {
     setTimeout(updateDynamicStats, 100);
+		setTimeout(updatePublishedCount, 100);
   });
 </script>

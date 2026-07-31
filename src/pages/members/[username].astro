@@ -1,0 +1,37 @@
+---
+export const prerender = false;
+import CommunityLayout from "@layouts/CommunityLayout.astro";
+import PublishedUserPostCard from "@/components/layout/PublishedUserPostCard.astro";
+import { query } from "@/lib/server/db";
+
+const username = decodeURIComponent(Astro.params.username || "");
+const member = (await query<{ id: string; username: string; display_name: string; bio: string; website: string; created_at: Date }>(
+	"SELECT id::text, username, display_name, bio, website, created_at FROM users WHERE lower(username) = lower($1) AND active = TRUE",
+	[username],
+)).rows[0];
+if (!member) return new Response("用户不存在", { status: 404 });
+const posts = await query<{ title: string; slug: string; excerpt: string; username: string; published_at: Date }>(
+	`SELECT p.title, p.slug, p.excerpt, u.username, p.published_at
+	 FROM community_posts p JOIN users u ON u.id = p.author_id
+	 WHERE p.author_id = $1 AND p.status = 'published' ORDER BY p.published_at DESC`,
+	[member.id],
+);
+const name = member.display_name || member.username;
+const initial = name.slice(0, 1).toUpperCase();
+const safeWebsite = /^https?:\/\//i.test(member.website) ? member.website : "";
+---
+
+<CommunityLayout title={name} description={`@${member.username} 的个人主页`}>
+	<section class="card-base community-card community-profile">
+		<div class="community-avatar" aria-hidden="true">{initial}</div>
+		<div><h3>{name}</h3><p class="community-muted">@{member.username} · 加入于 {new Date(member.created_at).toLocaleDateString("zh-CN")}</p></div>
+		<p class="community-profile-bio">{member.bio || "这位作者还没有填写个人简介。"}</p>
+		{safeWebsite && <p><a class="community-author-link" href={safeWebsite} target="_blank" rel="noopener noreferrer">访问个人网站</a></p>}
+	</section>
+	<section>
+		<h3 class="community-section-title">已发布文章（{posts.rows.length}）</h3>
+		{posts.rows.length === 0 ? <div class="card-base community-card community-muted">暂时还没有已发布文章。</div> : (
+			<div class="flex flex-col gap-4">{posts.rows.map((post) => <PublishedUserPostCard {...post} published={post.published_at} />)}</div>
+		)}
+	</section>
+</CommunityLayout>

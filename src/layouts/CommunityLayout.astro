@@ -1,0 +1,30 @@
+---
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import "@/styles/community.css";
+
+interface Props {
+	title: string;
+	description?: string;
+}
+
+const { title, description = "guamian 社区创作空间" } = Astro.props;
+---
+
+<MainGridLayout title={title} description={description}>
+	<div class="community-shell">
+		<header class="community-header card-base">
+			<div>
+				<p class="community-eyebrow">GUAMIAN · CREATOR</p>
+				<h2>{title}</h2>
+				<p>{description}</p>
+			</div>
+			<nav aria-label="创作中心导航">
+				<a href="/">全部文章</a>
+				<a href="/write/">开始写作</a>
+				<a href="/dashboard/">我的创作</a>
+				<a href="/admin/">管理后台</a>
+			</nav>
+		</header>
+		<slot />
+	</div>
+</MainGridLayout>

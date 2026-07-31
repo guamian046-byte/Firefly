@@ -28,7 +28,7 @@ const showTitle = widgetConfig?.showTitle !== false;
 >
   <div>
     <!-- 公告栏内容 -->
-    <div class="text-neutral-600 dark:text-neutral-300 leading-relaxed mb-3">
+    <div data-announcement-content class="text-neutral-600 dark:text-neutral-300 leading-relaxed mb-3">
       {config.content}
     </div>
 
@@ -63,3 +63,17 @@ const showTitle = widgetConfig?.showTitle !== false;
     </div>
   </div>
 </WidgetLayout>
+
+<script>
+	async function loadAnnouncement() {
+		try {
+			const response = await fetch("/api/announcement");
+			if (!response.ok) return;
+			const data = await response.json();
+			document.querySelectorAll<HTMLElement>("[data-announcement-content]").forEach((element) => { element.textContent = data.content; });
+			document.querySelectorAll("#announcement .widget-title").forEach((element) => { element.textContent = data.title; });
+		} catch {}
+	}
+	loadAnnouncement();
+	document.addEventListener("swup:contentReplaced", loadAnnouncement);
+</script>

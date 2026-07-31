@@ -4,6 +4,9 @@
 declare global {
 	interface ImportMetaEnv {
 		readonly MEILI_MASTER_KEY: string;
+		readonly DATABASE_URL: string;
+		readonly ADMIN_EMAIL: string;
+		readonly GALLERY_UPLOAD_DIR?: string;
 	}
 
 	interface ITOCManager {

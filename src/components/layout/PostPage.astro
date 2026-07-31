@@ -2,9 +2,10 @@
 import type { CollectionEntry } from "astro:content";
 import { getPostUrlBySlug } from "@utils/url-utils";
 import PostCard from "@/components/layout/PostCard.astro";
+import PublishedUserPostCard from "@/components/layout/PublishedUserPostCard.astro";
 import { siteConfig } from "@/config";
 
-const { page } = Astro.props;
+const { page, publishedUserPosts = [] } = Astro.props;
 
 let delay = 0;
 const interval = 50;
@@ -34,6 +35,18 @@ const initialLayoutClass =
   data-column-width={columnWidth}
   style={`--post-card-min-width: ${columnWidth}px;`}
 >
+  {
+    publishedUserPosts.map((post: { title: string; slug: string; excerpt: string; username: string; published_at: Date }) => (
+      <PublishedUserPostCard
+        title={post.title}
+        slug={post.slug}
+        excerpt={post.excerpt}
+        username={post.username}
+        published={post.published_at}
+        style={`animation-delay: calc(var(--content-delay) + ${delay++ * interval}ms);`}
+      />
+    ))
+  }
   {
     page.data.map((entry: PostEntry, index: number) => (
       <PostCard

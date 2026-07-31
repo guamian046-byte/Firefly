@@ -15,6 +15,7 @@ import rehypeComponents from "rehype-components"; /* Render the custom directive
 import rehypeKatex from "rehype-katex";
 import "katex/dist/contrib/mhchem.mjs"; // 加载 mhchem 扩展
 import cloudflare from "@astrojs/cloudflare";
+import node from "@astrojs/node";
 import mdx from "@astrojs/mdx";
 import { pluginCollapsible } from "expressive-code-collapsible"; /* Collapsible */
 import { pluginLanguageBadge } from "expressive-code-language-badge"; /* Language Badge */
@@ -52,10 +53,16 @@ const adapter = process.env.CF_WORKERS
 	? cloudflare({
 			prerenderEnvironment: "node",
 		})
-	: undefined;
+	: node({ mode: "standalone" });
 
 // https://astro.build/config
 export default defineConfig({
+	output: "server",
+	security: {
+		// Nginx terminates HTTPS; application forms perform an equivalent
+		// forwarded-host-aware origin check in src/lib/server/auth.ts.
+		checkOrigin: false,
+	},
 	site: siteConfig.site_url,
 
 	base: "/",
@@ -330,4 +337,3 @@ export default defineConfig({
 		},
 	},
 });
-

@@ -1,241 +1,87 @@
 ---
+export const prerender = false;
+
+import { randomUUID } from "node:crypto";
 import { Icon } from "astro-icon/components";
 import AlbumCard from "@/components/pages/gallery/AlbumCard.astro";
-import { siteConfig } from "@/config";
-import I18nKey from "@/i18n/i18nKey";
-import { i18n } from "@/i18n/translation";
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
-import {
-	getAlbumCover,
-	getAlbumPhotos,
-	loadGalleryAlbums,
-} from "@/utils/gallery-utils";
-import { url } from "@/utils/url-utils";
+import { assertSameOrigin, getCurrentUser } from "@/lib/server/auth";
+import { query } from "@/lib/server/db";
 
-// 检查页面是否启用
-if (!siteConfig.pages.gallery) {
-	return Astro.redirect("/404/");
+const user = await getCurrentUser(Astro.cookies);
+let notice = "";
+let error = "";
+if (Astro.request.method === "POST") {
+	try {
+		assertSameOrigin(Astro.request);
+		if (!user)
+			return Astro.redirect(
+				`/login/?returnTo=${encodeURIComponent("/gallery/")}`,
+			);
+		const form = await Astro.request.formData();
+		const action = String(form.get("action") || "");
+		if (action === "create") {
+			const name = String(form.get("name") || "")
+				.trim()
+				.slice(0, 100);
+			const slug = String(form.get("slug") || "")
+				.trim()
+				.toLowerCase()
+				.replace(/[^a-z0-9-]/g, "-")
+				.replace(/-+/g, "-")
+				.replace(/^-|-$/g, "")
+				.slice(0, 80);
+			if (!name || !slug) throw new Error("请填写相册名称和英文地址");
+			await query(
+				"INSERT INTO gallery_albums (id, slug, name, description, location, album_date, tags, created_by) VALUES ($1, $2, $3, $4, $5, NULLIF($6, '')::date, $7, $8)",
+				[
+					randomUUID(),
+					slug,
+					name,
+					String(form.get("description") || "").slice(0, 500),
+					String(form.get("location") || "").slice(0, 120),
+					String(form.get("date") || ""),
+					String(form.get("tags") || "").slice(0, 500),
+					user.id,
+				],
+			);
+			notice = "相册已创建";
+		} else if (action === "delete") {
+			await query("DELETE FROM gallery_albums WHERE id = $1", [
+				String(form.get("albumId") || ""),
+			]);
+			notice = "相册已删除";
+		}
+	} catch (cause) {
+		error = cause instanceof Error ? cause.message : "操作失败";
+	}
 }
 
-const title = i18n(I18nKey.gallery);
-const description = i18n(I18nKey.galleryDescription);
-
-// 构建相册数据（扫描照片、获取封面）
-const galleryAlbums = loadGalleryAlbums();
-const albums = galleryAlbums.map((album) => {
-	const photos = getAlbumPhotos(album);
-	const cover = getAlbumCover(album, photos);
-	return { ...album, cover, photoCount: photos.length };
-});
-
-// 收集所有标签用于筛选
-const allTags = [...new Set(albums.flatMap((a) => a.tags || []))].sort();
+const albums = await query<{
+	id: string;
+	slug: string;
+	name: string;
+	description: string;
+	location: string;
+	album_date: string | null;
+	tags: string;
+	photo_count: number;
+	cover_id: string | null;
+}>(
+	`SELECT a.id::text, a.slug, a.name, a.description, a.location, a.album_date::text, a.tags,
+	 COUNT(p.id)::int AS photo_count, (ARRAY_AGG(p.id::text ORDER BY p.created_at) FILTER (WHERE p.id IS NOT NULL))[1] AS cover_id
+	 FROM gallery_albums a LEFT JOIN gallery_photos p ON p.album_id = a.id
+	 GROUP BY a.id ORDER BY a.album_date DESC NULLS LAST, a.created_at DESC`,
+);
 ---
 
-<MainGridLayout title={title} description={description}>
-  <div
-    class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32"
-  >
-    <div class="card-base z-10 px-9 py-6 relative w-full">
-      <!-- 页面标题和描述 -->
-      <div class="mb-4 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div class="flex items-center gap-3 mb-3">
-            <div
-              class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70"
-            >
-              <Icon is:inline name="material-symbols:photo-library" class="text-[1.5rem]" />
-            </div>
-            <div class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
-              {title}
-            </div>
-          </div>
-          {description && (
-            <p class="text-base text-neutral-600 dark:text-neutral-400 leading-relaxed">
-              {description}
-            </p>
-          )}
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <a
-            href={url("/admin/#/collections/gallery/new")}
-            target="_blank"
-            class="btn-regular inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium"
-          >
-            <Icon is:inline name="material-symbols:add-photo-alternate-outline" class="text-lg" />
-            新建相册
-          </a>
-          <a
-            href={url("/admin/#/collections/gallery")}
-            target="_blank"
-            class="btn-regular inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium"
-          >
-            <Icon is:inline name="material-symbols:edit-square-outline" class="text-lg" />
-            管理相册
-          </a>
-          <a
-            href={url("/admin/#/media")}
-            target="_blank"
-            class="btn-regular inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium"
-          >
-            <Icon is:inline name="material-symbols:perm-media-outline" class="text-lg" />
-            管理图片
-          </a>
-        </div>
-      </div>
-
-      <!-- 搜索框 + 标签筛选 -->
-      {albums.length > 0 && (
-        <gallery-filter class="mb-6">
-          <div class="relative mb-3">
-            <Icon is:inline
-              name="material-symbols:search"
-              class="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500 text-lg pointer-events-none"
-            />
-            <input
-              type="text"
-              data-search
-              placeholder={i18n(I18nKey.searchAlbums)}
-              class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-(--line-divider) bg-transparent text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:border-(--primary) focus:ring-1 focus:ring-(--primary) outline-none transition-all duration-200 text-sm"
-            />
-          </div>
-          {allTags.length > 0 && (
-            <div class="flex flex-wrap gap-2">
-              <button
-                data-tag="all"
-                class="category-pill px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-200"
-                data-active
-              >
-                {i18n(I18nKey.all)}
-              </button>
-              {allTags.map((tag) => (
-                <button
-                  data-tag={tag}
-                  class="category-pill px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-200"
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          )}
-        </gallery-filter>
-      )}
-
-      <!-- 相册卡片网格 -->
-      {albums.length > 0 ? (
-        <>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 my-4">
-            {albums.map((album) => (
-              <AlbumCard
-                id={album.id}
-                name={album.name}
-                cover={album.cover}
-                description={album.description}
-                date={album.date}
-                location={album.location}
-                tags={album.tags}
-                photoCount={album.photoCount}
-                encrypted={!!album.password}
-              />
-            ))}
-          </div>
-          {/* 搜索无结果提示 */}
-          <div class="albums-empty hidden flex-col items-center justify-center py-12 text-neutral-400 dark:text-neutral-500">
-            <Icon is:inline name="material-symbols:search-off-rounded" class="text-4xl mb-3" />
-            <div class="text-sm">{i18n(I18nKey.searchNoResults)}</div>
-          </div>
-        </>
-      ) : (
-        <div class="flex flex-col items-center justify-center py-16 text-neutral-400 dark:text-neutral-500">
-          <Icon is:inline name="material-symbols:photo-library" class="text-6xl mb-4 opacity-50" />
-          <p class="text-lg">{i18n(I18nKey.galleryNoAlbums)}</p>
-        </div>
-      )}
-    </div>
-  </div>
-
-  <script slot="head" is:inline>
-    if (!customElements.get("gallery-filter")) {
-      class GalleryFilter extends HTMLElement {
-        selectedTag = "all";
-
-        constructor() {
-          super();
-        }
-
-        connectedCallback() {
-          this.addEventListener("click", this.handleClick);
-          const input = this.querySelector("[data-search]");
-          if (input) {
-            input.addEventListener("input", () => this.applyFilters());
-          }
-        }
-
-        disconnectedCallback() {
-          this.removeEventListener("click", this.handleClick);
-        }
-
-        handleClick(e) {
-          const target = e.target;
-          const button = target.closest("button");
-          if (!button) return;
-
-          this.selectedTag = button.dataset.tag;
-          const filters = this.querySelectorAll("button");
-
-          filters.forEach((f) => {
-            f.removeAttribute("data-active");
-          });
-          button.setAttribute("data-active", "");
-
-          this.applyFilters();
-        }
-
-        applyFilters() {
-          const container = this.closest(".card-base");
-          if (!container) return;
-
-          const input = this.querySelector("[data-search]");
-          const query = (input?.value || "").toLowerCase().trim();
-          const cards = container.querySelectorAll(".album-card");
-
-          let hasVisible = false;
-
-          cards.forEach((card) => {
-            const cardEl = card;
-            const tags = (cardEl.dataset.tags || "").split(",");
-            const name = (cardEl.querySelector("h3")?.textContent || "").toLowerCase();
-            const desc = (cardEl.querySelector("p")?.textContent || "").toLowerCase();
-            const location = (cardEl.querySelector(".inline-flex")?.textContent || "").toLowerCase();
-
-            const tagMatch =
-              this.selectedTag === "all" ||
-              (this.selectedTag && tags.includes(this.selectedTag));
-            const searchMatch =
-              !query ||
-              name.includes(query) ||
-              desc.includes(query) ||
-              location.includes(query) ||
-              tags.some((t) => t.toLowerCase().includes(query));
-
-            if (tagMatch && searchMatch) {
-              cardEl.style.display = "";
-              cardEl.classList.add("animate-fade-in-up");
-              hasVisible = true;
-            } else {
-              cardEl.style.display = "none";
-              cardEl.classList.remove("animate-fade-in-up");
-            }
-          });
-
-          const emptyEl = container.querySelector(".albums-empty");
-          if (emptyEl) {
-            emptyEl.classList.toggle("hidden", hasVisible);
-            emptyEl.classList.toggle("flex", !hasVisible);
-          }
-        }
-      }
-      customElements.define("gallery-filter", GalleryFilter);
-    }
-  </script>
+<MainGridLayout title="共享相册" description="登录用户都可以创建相册、上传和管理图片。">
+	<section class="card-base community-card">
+		<div class="community-actions" style="justify-content:space-between"><div><h1 class="text-3xl font-bold">共享相册</h1><p class="community-muted">图片保存在腾讯云服务器，所有登录用户共同维护。</p></div>{!user && <a class="community-button primary" href="/login/?returnTo=%2Fgallery%2F">登录后管理</a>}</div>
+		{notice && <p class="community-alert mt-4">{notice}</p>}{error && <p class="community-alert error mt-4">{error}</p>}
+		{user && <details class="mt-5"><summary class="community-button primary inline-block cursor-pointer"><Icon is:inline name="material-symbols:add-photo-alternate-outline"/> 新建相册</summary><form method="post" class="community-form mt-4"><input type="hidden" name="action" value="create"/><label>相册名称<input name="name" maxlength="100" required/></label><label>英文地址<input name="slug" maxlength="80" pattern="[a-zA-Z0-9-]+" placeholder="summer-2026" required/></label><label>描述<input name="description" maxlength="500"/></label><div class="community-grid"><label>地点<input name="location" maxlength="120"/></label><label>日期<input name="date" type="date"/></label></div><label>标签（用英文逗号分隔）<input name="tags" maxlength="500"/></label><button class="community-button primary">创建相册</button></form></details>}
+	</section>
+	<section class="card-base community-card">
+		{albums.rows.length ? <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{albums.rows.map((album) => <div><AlbumCard id={album.slug} name={album.name} cover={album.cover_id ? `/api/gallery/photos/${album.cover_id}` : ""} description={album.description} date={album.album_date || undefined} location={album.location} tags={album.tags.split(",").map((tag) => tag.trim()).filter(Boolean)} photoCount={album.photo_count}/>{user && <form method="post" class="mt-2" onsubmit="return confirm('确定删除整个相册吗？')"><input type="hidden" name="action" value="delete"/><input type="hidden" name="albumId" value={album.id}/><button class="community-button">删除相册</button></form>}</div>)}</div> : <p class="community-muted">还没有相册，登录后创建第一个吧。</p>}
+	</section>
 </MainGridLayout>

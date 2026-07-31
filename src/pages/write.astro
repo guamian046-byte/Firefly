@@ -1,0 +1,67 @@
+---
+export const prerender = false;
+import { randomUUID } from "node:crypto";
+import CommunityLayout from "@layouts/CommunityLayout.astro";
+import { assertSameOrigin, getCurrentUser } from "@/lib/server/auth";
+import { query } from "@/lib/server/db";
+import { getSitePermissions } from "@/lib/server/settings";
+import MarkdownEditor from "@/components/community/MarkdownEditor.svelte";
+
+const user = await getCurrentUser(Astro.cookies);
+if (!user) return Astro.redirect("/login/");
+const permissions = await getSitePermissions();
+const requestedId = Astro.url.searchParams.get("id");
+let error = "";
+let notice = "";
+let post: { id: string; title: string; excerpt: string; body: string; status: string } | undefined;
+if (requestedId) {
+	post = (await query<typeof post & {}>("SELECT id::text, title, excerpt, body, status FROM community_posts WHERE id = $1 AND author_id = $2", [requestedId, user.id])).rows[0];
+	if (!post) return new Response("文章不存在", { status: 404 });
+}
+
+if (Astro.request.method === "POST") {
+	try {
+		assertSameOrigin(Astro.request);
+		if (!permissions.publishingEnabled) throw new Error("管理员目前暂停了创作功能");
+		const form = await Astro.request.formData();
+		const id = String(form.get("id") || randomUUID());
+		const title = String(form.get("title") || "").trim();
+		const excerpt = String(form.get("excerpt") || "").trim();
+		const body = String(form.get("body") || "").trim();
+		const intent = String(form.get("intent") || "draft");
+		if (title.length < 2 || title.length > 120) throw new Error("标题需为 2–120 个字符");
+		if (excerpt.length > 300) throw new Error("摘要不能超过 300 个字符");
+		if (body.length < 20) throw new Error("正文至少需要 20 个字符");
+		const existing = await query<{ status: string }>("SELECT status FROM community_posts WHERE id = $1 AND author_id = $2", [id, user.id]);
+		if (existing.rows[0]?.status === "published" && user.role !== "admin") throw new Error("已发布文章需要管理员协助修改");
+		const status = intent === "submit" ? (permissions.requireReview && !["admin", "author"].includes(user.role) ? "pending" : "published") : "draft";
+		const slugBase = title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9\s-]/g, "").trim().replace(/[\s-]+/g, "-").slice(0, 100) || `post-${id.slice(0, 8)}`;
+		const slug = status === "published" ? `${slugBase}-${id.slice(0, 6)}` : null;
+		await query(
+			`INSERT INTO community_posts (id, author_id, title, excerpt, body, status, slug, published_at)
+			 VALUES ($1, $2, $3, $4, $5, $6::varchar(16), $7, CASE WHEN $6::varchar(16) = 'published' THEN NOW() ELSE NULL END)
+			 ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, excerpt = EXCLUDED.excerpt, body = EXCLUDED.body,
+			 status = EXCLUDED.status, slug = COALESCE(community_posts.slug, EXCLUDED.slug), review_note = '', updated_at = NOW(),
+			 published_at = CASE WHEN EXCLUDED.status = 'published' THEN COALESCE(community_posts.published_at, NOW()) ELSE community_posts.published_at END
+			 WHERE community_posts.author_id = $2`,
+			[id, user.id, title, excerpt, body, status, slug],
+		);
+		if (intent === "submit") return Astro.redirect("/dashboard/");
+		notice = "草稿已保存";
+		post = { id, title, excerpt, body, status };
+	} catch (cause) { error = cause instanceof Error ? cause.message : "保存失败"; }
+}
+---
+<CommunityLayout title={post ? "编辑文章" : "开始写作"} description="使用 Markdown 写作，随时保存草稿，完成后提交审核。">
+	<section class="card-base community-card">
+		{!permissions.publishingEnabled && <p class="community-alert">管理员目前暂停了创作和投稿。</p>}
+		{notice && <p class="community-alert">{notice}</p>}{error && <p class="community-alert error">{error}</p>}
+		<form method="post" class="community-form">
+			<input type="hidden" name="id" value={post?.id || ""} />
+			<label>文章标题<input name="title" required maxlength="120" value={post?.title || ""} placeholder="给文章一个清晰的标题" /></label>
+			<label>摘要<input name="excerpt" maxlength="300" value={post?.excerpt || ""} placeholder="用一两句话介绍文章内容" /></label>
+			<MarkdownEditor client:load value={post?.body || ""} />
+			<div class="community-actions"><button class="community-button" name="intent" value="draft" disabled={!permissions.publishingEnabled}>保存草稿</button><button class="community-button primary" name="intent" value="submit" disabled={!permissions.publishingEnabled}>{permissions.requireReview && !["admin", "author"].includes(user.role) ? "提交审核" : "立即发布"}</button></div>
+		</form>
+	</section>
+</CommunityLayout>

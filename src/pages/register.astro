@@ -1,0 +1,46 @@
+---
+export const prerender = false;
+import CommunityLayout from "@layouts/CommunityLayout.astro";
+import { assertSameOrigin, createSession, getCurrentUser, hashPassword } from "@/lib/server/auth";
+import { query } from "@/lib/server/db";
+import { getSitePermissions } from "@/lib/server/settings";
+
+if (await getCurrentUser(Astro.cookies)) return Astro.redirect("/dashboard/");
+const permissions = await getSitePermissions();
+let error = "";
+if (Astro.request.method === "POST") {
+	try {
+		assertSameOrigin(Astro.request);
+		if (!permissions.registrationEnabled) throw new Error("管理员暂未开放注册");
+		const form = await Astro.request.formData();
+		const email = String(form.get("email") || "").trim().toLowerCase();
+		const username = String(form.get("username") || "").trim();
+		const password = String(form.get("password") || "");
+		if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("请输入有效邮箱");
+		if (!/^[\p{L}\p{N}_-]{2,24}$/u.test(username)) throw new Error("昵称需为 2–24 个文字、字母或数字");
+		if (password.length < 8 || password.length > 128) throw new Error("密码长度需为 8–128 位");
+		const adminEmail = (import.meta.env.ADMIN_EMAIL || "").trim().toLowerCase();
+		const role = email === adminEmail ? "admin" : "user";
+		const result = await query<{ id: string }>(
+			"INSERT INTO users (email, username, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id::text",
+			[email, username, await hashPassword(password), role],
+		);
+		await createSession(result.rows[0].id, Astro.cookies);
+		return Astro.redirect("/dashboard/");
+	} catch (cause) {
+		error = cause instanceof Error && cause.message.includes("unique") ? "邮箱或昵称已经被使用" : cause instanceof Error ? cause.message : "注册失败";
+	}
+}
+---
+<CommunityLayout title="加入创作社区" description="注册后即可保存草稿，并提交自己的博客文章。">
+	<section class="card-base community-card">
+		{!permissions.registrationEnabled && <p class="community-alert">管理员目前关闭了新用户注册。</p>}
+		{error && <p class="community-alert error">{error}</p>}
+		<form method="post" class="community-form">
+			<label>昵称<input name="username" autocomplete="username" required minlength="2" maxlength="24" /></label>
+			<label>邮箱<input name="email" type="email" autocomplete="email" required /></label>
+			<label>密码<input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128" /></label>
+			<div class="community-actions"><button class="community-button primary" disabled={!permissions.registrationEnabled}>创建账号</button><a href="/login/">已有账号，去登录</a></div>
+		</form>
+	</section>
+</CommunityLayout>

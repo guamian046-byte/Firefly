@@ -1,0 +1,134 @@
+---
+export const prerender = false;
+
+import CommunityLayout from "@layouts/CommunityLayout.astro";
+import { assertSameOrigin, getCurrentUser, isAdmin } from "@/lib/server/auth";
+import { query } from "@/lib/server/db";
+import {
+	getSitePermissions,
+	updateSitePermissions,
+} from "@/lib/server/settings";
+
+const user = await getCurrentUser(Astro.cookies);
+if (!user) return Astro.redirect("/login/");
+if (!isAdmin(user)) return new Response("无权访问管理员后台", { status: 403 });
+let notice = "";
+let error = "";
+if (Astro.request.method === "POST") {
+	try {
+		assertSameOrigin(Astro.request);
+		const form = await Astro.request.formData();
+		const action = String(form.get("action") || "");
+		if (action === "settings") {
+			await updateSitePermissions({
+				registrationEnabled: form.has("registrationEnabled"),
+				publishingEnabled: form.has("publishingEnabled"),
+				requireReview: form.has("requireReview"),
+			});
+			notice = "站点权限设置已更新";
+		} else if (action === "announcement") {
+			const title = String(form.get("title") || "公告")
+				.trim()
+				.slice(0, 80);
+			const content = String(form.get("content") || "")
+				.trim()
+				.slice(0, 2000);
+			for (const [key, value] of [
+				["announcement_title", title],
+				["announcement_content", content],
+			]) {
+				await query(
+					"INSERT INTO site_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()",
+					[key, value],
+				);
+			}
+			notice = "公告已更新";
+		} else if (action === "user") {
+			const targetId = String(form.get("userId") || "");
+			const role = String(form.get("role") || "user");
+			const active = form.has("active");
+			if (!["user", "author", "moderator", "admin"].includes(role))
+				throw new Error("无效角色");
+			if (targetId === user.id && (role !== "admin" || !active))
+				throw new Error("不能撤销自己的管理员权限或停用自己的账号");
+			await query(
+				"UPDATE users SET role = $1, active = $2, updated_at = NOW() WHERE id = $3",
+				[role, active, targetId],
+			);
+			notice = "用户权限已更新";
+		} else if (action === "review") {
+			const postId = String(form.get("postId") || "");
+			const decision = String(form.get("decision") || "");
+			const note = String(form.get("note") || "").slice(0, 300);
+			if (!["published", "rejected"].includes(decision))
+				throw new Error("无效审核操作");
+			const target = (
+				await query<{ title: string }>(
+					"SELECT title FROM community_posts WHERE id = $1",
+					[postId],
+				)
+			).rows[0];
+			if (!target) throw new Error("文章不存在");
+			const slugBase =
+				target.title
+					.toLowerCase()
+					.normalize("NFKD")
+					.replace(/[^a-z0-9\s-]/g, "")
+					.trim()
+					.replace(/[\s-]+/g, "-")
+					.slice(0, 100) || `post-${postId.slice(0, 8)}`;
+			await query(
+				`UPDATE community_posts SET status = $1::varchar(16), review_note = $2, updated_at = NOW(), slug = CASE WHEN $1::varchar(16) = 'published' THEN COALESCE(slug, $3) ELSE slug END, published_at = CASE WHEN $1::varchar(16) = 'published' THEN COALESCE(published_at, NOW()) ELSE published_at END WHERE id = $4`,
+				[decision, note, `${slugBase}-${postId.slice(0, 6)}`, postId],
+			);
+			notice = decision === "published" ? "文章已发布" : "文章已退回修改";
+		}
+	} catch (cause) {
+		error = cause instanceof Error ? cause.message : "操作失败";
+	}
+}
+const permissions = await getSitePermissions();
+const announcementRows = await query<{ key: string; value: string }>(
+	"SELECT key, value FROM site_settings WHERE key IN ('announcement_title', 'announcement_content')",
+);
+const announcement = Object.fromEntries(
+	announcementRows.rows.map((row) => [row.key, row.value]),
+);
+const users = await query<{
+	id: string;
+	email: string;
+	username: string;
+	display_name: string;
+	bio: string;
+	website: string;
+	role: string;
+	active: boolean;
+	created_at: Date;
+	updated_at: Date;
+	total_posts: number;
+	published_posts: number;
+	pending_posts: number;
+}>(
+	`SELECT u.id::text, u.email, u.username, u.display_name, u.bio, u.website, u.role, u.active, u.created_at, u.updated_at,
+	 COUNT(p.id)::int AS total_posts,
+	 COUNT(p.id) FILTER (WHERE p.status = 'published')::int AS published_posts,
+	 COUNT(p.id) FILTER (WHERE p.status = 'pending')::int AS pending_posts
+	 FROM users u LEFT JOIN community_posts p ON p.author_id = u.id
+	 GROUP BY u.id ORDER BY u.created_at DESC LIMIT 200`,
+);
+const pending = await query<{
+	id: string;
+	title: string;
+	excerpt: string;
+	username: string;
+}>(
+	`SELECT p.id::text, p.title, p.excerpt, u.username FROM community_posts p JOIN users u ON u.id = p.author_id WHERE p.status = 'pending' ORDER BY p.updated_at ASC`,
+);
+---
+<CommunityLayout title="管理员后台" description="管理开放策略、用户角色和待审核文章。">
+	{notice && <p class="community-alert">{notice}</p>}{error && <p class="community-alert error">{error}</p>}
+	<section class="card-base community-card"><h3>网站公告</h3><form method="post" class="community-form"><input type="hidden" name="action" value="announcement"/><label>公告标题<input name="title" maxlength="80" value={announcement.announcement_title || "公告"}/></label><label>公告内容<textarea class="community-short-textarea" name="content" maxlength="2000">{announcement.announcement_content || ""}</textarea></label><div><button class="community-button primary">更新公告</button></div></form></section>
+	<section class="card-base community-card"><h3>权限总开关</h3><form method="post" class="community-form"><input type="hidden" name="action" value="settings"/><label class="community-inline"><input type="checkbox" name="registrationEnabled" checked={permissions.registrationEnabled}/>允许访客注册账号</label><label class="community-inline"><input type="checkbox" name="publishingEnabled" checked={permissions.publishingEnabled}/>允许用户写作和投稿</label><label class="community-inline"><input type="checkbox" name="requireReview" checked={permissions.requireReview}/>普通用户文章必须审核</label><div><button class="community-button primary">保存设置</button></div></form></section>
+	<section class="card-base community-card"><h3>待审核文章（{pending.rows.length}）</h3>{pending.rows.length === 0 ? <p class="community-muted">目前没有待审核文章。</p> : pending.rows.map((post) => <form method="post" class="community-form community-post-card"><input type="hidden" name="action" value="review"/><input type="hidden" name="postId" value={post.id}/><strong>{post.title}</strong><span class="community-meta">作者 {post.username}</span><p>{post.excerpt}</p><label>审核意见<input name="note" maxlength="300"/></label><div class="community-actions"><button class="community-button primary" name="decision" value="published">通过并发布</button><button class="community-button" name="decision" value="rejected">退回修改</button></div></form>)}</section>
+	<section class="card-base community-card"><h3>全部成员（{users.rows.length}）</h3><table class="community-table"><thead><tr><th>成员资料</th><th>文章</th><th>账号信息</th><th>权限设置</th></tr></thead><tbody>{users.rows.map((account) => <tr><td><strong>{account.display_name || account.username}</strong> <a href={`/members/${encodeURIComponent(account.username)}/`}>@{account.username}</a><br/><small>{account.bio || "未填写简介"}</small>{account.website && <><br/><small>{account.website}</small></>}</td><td>全部 {account.total_posts}<br/><small>已发布 {account.published_posts} · 待审核 {account.pending_posts}</small></td><td>{account.email}<br/><small>注册：{new Date(account.created_at).toLocaleDateString("zh-CN")} · 更新：{new Date(account.updated_at).toLocaleDateString("zh-CN")}</small></td><td><form method="post" class="community-inline"><input type="hidden" name="action" value="user"/><input type="hidden" name="userId" value={account.id}/><select name="role"><option value="user" selected={account.role === "user"}>普通用户</option><option value="author" selected={account.role === "author"}>可信作者</option><option value="moderator" selected={account.role === "moderator"}>审核员</option><option value="admin" selected={account.role === "admin"}>管理员</option></select><label class="community-inline"><input type="checkbox" name="active" checked={account.active}/>启用</label><button class="community-button">保存</button></form></td></tr>)}</tbody></table></section>
+</CommunityLayout>

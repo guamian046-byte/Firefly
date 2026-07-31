@@ -1,0 +1,40 @@
+---
+export const prerender = false;
+import Pagination from "@/components/common/Pagination.astro";
+import PostPage from "@/components/layout/PostPage.astro";
+import { siteConfig } from "@/config";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import { query } from "@/lib/server/db";
+import { getSortedPosts } from "@/utils/content-utils";
+
+const allBlogPosts = await getSortedPosts();
+const pageSize = siteConfig.pagination.postsPerPage;
+const staticPosts = allBlogPosts.slice(0, pageSize);
+const lastPage = Math.max(1, Math.ceil(allBlogPosts.length / pageSize));
+const page = {
+	data: staticPosts,
+	start: 0,
+	end: staticPosts.length - 1,
+	size: pageSize,
+	total: allBlogPosts.length,
+	currentPage: 1,
+	lastPage,
+	url: {
+		current: "/",
+		next: lastPage > 1 ? "/2/" : undefined,
+		prev: undefined,
+		first: undefined,
+		last: lastPage > 1 ? `/${lastPage}/` : undefined,
+	},
+};
+const publishedUserPosts = await query<{ title: string; slug: string; excerpt: string; username: string; published_at: Date }>(
+	`SELECT p.title, p.slug, p.excerpt, u.username, p.published_at
+	 FROM community_posts p JOIN users u ON u.id = p.author_id
+	 WHERE p.status = 'published' ORDER BY p.published_at DESC LIMIT 50`,
+);
+---
+
+<MainGridLayout>
+	<PostPage page={page} publishedUserPosts={publishedUserPosts.rows} />
+	{lastPage > 1 && <Pagination class="mx-auto onload-animation" page={page} />}
+</MainGridLayout>

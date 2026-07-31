@@ -1,0 +1,43 @@
+.community-shell { display: grid; gap: 1rem; }
+#content-wrapper:has(.community-shell) { animation: none !important; opacity: 1 !important; }
+html.is-animating .transition-main:has(.community-shell), html.is-changing .transition-main:has(.community-shell) { transform: none !important; }
+.community-header { padding: 1.4rem 1.6rem; display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; }
+.community-header h2 { margin: .15rem 0 .35rem; font-size: clamp(1.55rem, 4vw, 2.25rem); font-weight: 800; }
+.community-header p { opacity: .68; }
+.community-eyebrow { color: var(--primary)!important; font-size: .72rem; letter-spacing: .18em; font-weight: 800; }
+.community-header nav { display: flex; flex-wrap: wrap; gap: .55rem; justify-content: end; }
+.community-header nav a, .community-button { border-radius: .75rem; padding: .65rem .9rem; background: var(--btn-plain-bg-hover); font-weight: 650; transition: .2s ease; }
+.community-header nav a:hover, .community-button:hover { background: var(--primary); color: white; transform: translateY(-1px); }
+.community-card { padding: 1.4rem 1.6rem; }
+.community-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+.community-post-card { padding: 1.25rem; display: grid; gap: .65rem; }
+.community-post-card h3 { font-size: 1.2rem; font-weight: 750; }
+.community-meta, .community-muted { opacity: .68; font-size: .9rem; }
+.community-author-link { font-weight: 700; color: var(--primary); }
+.community-profile { display: grid; grid-template-columns: auto 1fr; gap: 1rem 1.25rem; align-items: center; }
+.community-avatar { width: 4.5rem; height: 4.5rem; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--primary) 16%, var(--card-bg)); color: var(--primary); font-size: 1.8rem; font-weight: 800; }
+.community-profile h3 { font-size: 1.4rem; font-weight: 800; }
+.community-profile-bio { grid-column: 1 / -1; white-space: pre-wrap; }
+.community-form { display: grid; gap: 1rem; }
+.community-form label { display: grid; gap: .4rem; font-weight: 650; }
+.community-form input, .community-form textarea, .community-form select { width: 100%; border: 1px solid var(--line-divider); background: var(--card-bg); color: inherit; border-radius: .75rem; padding: .75rem .9rem; outline: none; }
+.community-form input:focus, .community-form textarea:focus, .community-form select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent); }
+.community-form textarea { min-height: 24rem; resize: vertical; font-family: var(--font-mono, ui-monospace, monospace); line-height: 1.7; }
+.community-form textarea.community-short-textarea { min-height: 8rem; font-family: inherit; }
+.community-section-title { margin: .35rem 0 .8rem; font-size: 1.15rem; font-weight: 800; }
+.community-actions { display: flex; gap: .7rem; flex-wrap: wrap; align-items: center; }
+.community-button { border: 0; cursor: pointer; color: inherit; }
+.community-button.primary { background: var(--primary); color: white; }
+.community-alert { padding: .8rem 1rem; border-radius: .75rem; background: color-mix(in srgb, var(--primary) 12%, var(--card-bg)); }
+.community-alert.error { background: color-mix(in srgb, #ef4444 14%, var(--card-bg)); color: #dc2626; }
+.community-table { width: 100%; border-collapse: collapse; }
+.community-table th, .community-table td { text-align: left; padding: .75rem .5rem; border-bottom: 1px solid var(--line-divider); vertical-align: middle; }
+.community-inline { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.community-article { padding: clamp(1.25rem, 4vw, 2.5rem); }
+.community-article h1 { font-size: clamp(1.8rem, 5vw, 2.8rem); font-weight: 800; margin-bottom: .8rem; }
+.community-comment { padding: 1rem; border: 1px solid var(--line-divider); border-radius: .85rem; background: color-mix(in srgb, var(--card-bg) 92%, var(--primary) 8%); }
+.community-comment > div { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+.community-comment time { opacity: .55; font-size: .78rem; }
+.community-comment p { margin-top: .55rem; white-space: normal; overflow-wrap: anywhere; }
+.community-comment button { margin-top: .6rem; color: #dc2626; font-size: .8rem; }
+@media (max-width: 720px) { .community-header { align-items: start; flex-direction: column; } .community-header nav { justify-content: start; } .community-table { display: block; overflow-x: auto; } }

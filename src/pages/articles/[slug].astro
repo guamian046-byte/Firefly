@@ -1,0 +1,36 @@
+---
+export const prerender = false;
+
+import Comment from "@components/comment/index.astro";
+import CommunityLayout from "@layouts/CommunityLayout.astro";
+import { query } from "@/lib/server/db";
+import { renderUserMarkdown } from "@/lib/server/markdown";
+
+const slug = Astro.params.slug;
+const post = (
+	await query<{
+		title: string;
+		excerpt: string;
+		body: string;
+		username: string;
+		published_at: Date;
+		updated_at: Date;
+	}>(
+		`SELECT p.title, p.excerpt, p.body, u.username, p.published_at, p.updated_at
+	 FROM community_posts p JOIN users u ON u.id = p.author_id
+	 WHERE p.slug = $1 AND p.status = 'published'`,
+		[slug],
+	)
+).rows[0];
+if (!post) return new Response("文章不存在", { status: 404 });
+const html = renderUserMarkdown(post.body);
+---
+
+<CommunityLayout title={post.title} description={post.excerpt || `${post.username} 发布的文章`}>
+	<article class="card-base community-article">
+		<h1>{post.title}</h1>
+		<p class="community-meta">作者：<a class="community-author-link" href={`/members/${encodeURIComponent(post.username)}/`}>{post.username}</a> · 发布于 {new Date(post.published_at).toLocaleDateString("zh-CN")}</p>
+		<div class="markdown-content" set:html={html}></div>
+	</article>
+	<Comment customPath={`/articles/${slug}/`} />
+</CommunityLayout>

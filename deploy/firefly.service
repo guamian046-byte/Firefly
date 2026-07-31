@@ -1,0 +1,22 @@
+[Unit]
+Description=Firefly multi-user blog
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/var/www/guamian/current
+EnvironmentFile=/etc/firefly.env
+Environment=HOST=127.0.0.1
+Environment=PORT=4321
+ExecStart=/usr/local/bin/node dist/server/entry.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/www/guamian
+
+[Install]
+WantedBy=multi-user.target
