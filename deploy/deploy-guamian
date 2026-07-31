@@ -1,6 +1,17 @@
 #!/bin/sh
 set -eu
 
+run_pnpm() {
+	if command -v pnpm >/dev/null 2>&1; then
+		pnpm "$@"
+	elif command -v corepack >/dev/null 2>&1; then
+		corepack pnpm "$@"
+	else
+		echo "pnpm or corepack is required on the server" >&2
+		exit 127
+	fi
+}
+
 archive="${1:-/tmp/guamian-site.tar.gz}"
 deploy_root="/var/www/guamian"
 release="$deploy_root/releases/$(date +%Y%m%d%H%M%S)"
@@ -9,7 +20,7 @@ test -f "$archive"
 install -d -m 755 "$release"
 tar -xzf "$archive" -C "$release"
 cd "$release"
-pnpm install --prod --frozen-lockfile
+run_pnpm install --prod --frozen-lockfile
 ln -sfn "$release" "$deploy_root/current.next"
 mv -Tf "$deploy_root/current.next" "$deploy_root/current"
 rm -f "$archive"
