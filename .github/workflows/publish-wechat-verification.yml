@@ -1,0 +1,38 @@
+name: Publish WeChat verification
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - public/685da571a819dd4b5a4518d6f452dc37.txt
+      - .github/workflows/publish-wechat-verification.yml
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST_KEY: ${{ secrets.SERVER_HOST_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SERVER_HOST_KEY" > ~/.ssh/known_hosts
+
+      - name: Upload verification file
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          scp -i ~/.ssh/deploy_key -P "${SERVER_PORT:-22}" \
+            public/685da571a819dd4b5a4518d6f452dc37.txt \
+            "$SERVER_USER@$SERVER_HOST:/var/www/guamian/current/dist/685da571a819dd4b5a4518d6f452dc37.txt"
