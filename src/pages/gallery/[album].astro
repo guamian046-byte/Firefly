@@ -126,7 +126,54 @@ const photos = await query<{
 ---
 
 <MainGridLayout title={album.name} description={album.description}>
-	<section class="card-base community-card"><a href="/gallery/" class="community-author-link">← 返回相册</a><h1 class="text-3xl font-bold mt-3">{album.name}</h1><p class="community-muted">{album.description}</p><p class="community-meta mt-2">{album.album_date || ""} {album.location ? `· ${album.location}` : ""} · {photos.rows.length} 张图片</p>{notice && <p class="community-alert mt-4">{notice}</p>}{error && <p class="community-alert error mt-4">{error}</p>}</section>
-	{user && <section class="card-base community-card"><div class="community-grid"><form method="post" enctype="multipart/form-data" class="community-form"><input type="hidden" name="action" value="upload"/><h3 class="community-section-title">上传图片</h3><input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple required/><button class="community-button primary">上传所选图片</button></form><form method="post" class="community-form"><input type="hidden" name="action" value="update"/><h3 class="community-section-title">修改相册资料</h3><label>名称<input name="name" value={album.name} required/></label><label>描述<input name="description" value={album.description}/></label><label>地点<input name="location" value={album.location}/></label><label>日期<input type="date" name="date" value={album.album_date || ""}/></label><label>标签<input name="tags" value={album.tags}/></label><button class="community-button">保存资料</button></form></div></section>}
-	<section class="card-base community-card">{photos.rows.length ? <div class="gallery-masonry" style="column-count:2;column-gap:.75rem">{photos.rows.map((photo) => <div class="break-inside-avoid mb-3"><PhotoCard src={`/api/gallery/photos/${photo.id}`} albumId={album.slug} alt={photo.file_name}/>{user && <form method="post" onsubmit="return confirm('确定删除这张图片吗？')"><input type="hidden" name="action" value="delete-photo"/><input type="hidden" name="photoId" value={photo.id}/><button class="community-button">删除图片</button></form>}</div>)}</div> : <div class="community-muted py-12 text-center"><Icon is:inline name="material-symbols:photo-library" class="text-5xl"/><p>还没有图片</p></div>}</section>
+	<section class="card-base album-hero">
+		<a href="/gallery/" class="album-back"><Icon is:inline name="material-symbols:arrow-back-rounded" /> 全部相册</a>
+		<div class="album-heading"><div><span class="album-eyebrow">PHOTO ALBUM</span><h1>{album.name}</h1>{album.description && <p>{album.description}</p>}</div><div class="album-count"><strong>{photos.rows.length}</strong><span>张图片</span></div></div>
+		<div class="album-meta">{album.album_date && <span><Icon is:inline name="material-symbols:calendar-month-outline-rounded" /> {album.album_date}</span>}{album.location && <span><Icon is:inline name="material-symbols:location-on-outline-rounded" /> {album.location}</span>}{album.tags.split(",").map((tag) => tag.trim()).filter(Boolean).map((tag) => <span class="album-tag">#{tag}</span>)}</div>
+	</section>
+	{notice && <p class="community-alert album-notice">{notice}</p>}{error && <p class="community-alert error album-notice">{error}</p>}
+	{user && <details class="card-base album-manager"><summary><Icon is:inline name="material-symbols:tune-rounded" /> 管理相册</summary><div class="community-grid album-manager-grid"><form method="post" enctype="multipart/form-data" class="community-form album-upload"><input type="hidden" name="action" value="upload"/><div class="album-form-title"><Icon is:inline name="material-symbols:cloud-upload-outline-rounded" /><div><h3>添加照片</h3><p>单张不超过 8MB，最多选择 20 张</p></div></div><label class="album-file"><input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple required/><span><Icon is:inline name="material-symbols:add-photo-alternate-outline-rounded" /> 选择照片</span></label><button class="community-button primary">上传所选图片</button></form><form method="post" class="community-form"><input type="hidden" name="action" value="update"/><div class="album-form-title"><Icon is:inline name="material-symbols:edit-note-rounded" /><div><h3>相册资料</h3><p>完善这段记忆的信息</p></div></div><label>名称<input name="name" value={album.name} required/></label><label>描述<input name="description" value={album.description}/></label><div class="community-grid"><label>地点<input name="location" value={album.location}/></label><label>日期<input type="date" name="date" value={album.album_date || ""}/></label></div><label>标签<input name="tags" value={album.tags}/></label><button class="community-button">保存资料</button></form></div></details>}
+	<section class="album-photos">{photos.rows.length ? <div class="gallery-masonry">{photos.rows.map((photo) => <article class="album-photo"><PhotoCard src={`/api/gallery/photos/${photo.id}`} albumId={album.slug} alt={photo.file_name}/>{user && <form method="post" class="photo-delete" onsubmit="return confirm('确定删除这张图片吗？')"><input type="hidden" name="action" value="delete-photo"/><input type="hidden" name="photoId" value={photo.id}/><button aria-label={`删除图片 ${photo.file_name}`} title="删除图片"><Icon is:inline name="material-symbols:delete-outline-rounded" /></button></form>}</article>)}</div> : <div class="card-base album-empty"><Icon is:inline name="material-symbols:photo-library-outline-rounded" /><h2>这里还没有照片</h2><p>{user ? "打开管理相册，上传第一张美好。" : "等待美好被收藏。"}</p></div>}</section>
 </MainGridLayout>
+
+<style>
+	.album-hero { padding: clamp(1.35rem, 4vw, 2.2rem); background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 11%, var(--card-bg)), var(--card-bg) 62%); }
+	.album-back { display: inline-flex; align-items: center; gap: .35rem; color: var(--primary); font-size: .85rem; font-weight: 720; }
+	.album-heading { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; margin-top: 1.25rem; }
+	.album-eyebrow { color: var(--primary); font-size: .68rem; font-weight: 850; letter-spacing: .18em; }
+	.album-heading h1 { margin: .15rem 0 .4rem; font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 850; line-height: 1.08; }
+	.album-heading p { max-width: 42rem; opacity: .65; }
+	.album-count { width: 5.2rem; height: 5.2rem; flex: none; display: grid; place-content: center; text-align: center; border-radius: 1.5rem; color: white; background: var(--primary); box-shadow: 0 12px 30px color-mix(in srgb, var(--primary) 24%, transparent); }
+	.album-count strong { font-size: 1.55rem; line-height: 1; }
+	.album-count span { margin-top: .3rem; font-size: .7rem; opacity: .8; }
+	.album-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .85rem; margin-top: 1.1rem; font-size: .8rem; opacity: .68; }
+	.album-meta span { display: inline-flex; align-items: center; gap: .25rem; }
+	.album-meta .album-tag { padding: .25rem .5rem; border-radius: 999px; color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); opacity: 1; }
+	.album-notice { margin-top: 1rem; }
+	.album-manager { margin-top: 1rem; padding: 0; overflow: hidden; }
+	.album-manager > summary { display: flex; align-items: center; gap: .45rem; padding: 1rem 1.25rem; list-style: none; font-weight: 750; cursor: pointer; }
+	.album-manager > summary::-webkit-details-marker { display: none; }
+	.album-manager[open] > summary { border-bottom: 1px solid var(--line-divider); color: var(--primary); }
+	.album-manager-grid { padding: 1.25rem; }
+	.album-manager-grid > form { align-content: start; padding: 1rem; border: 1px solid var(--line-divider); border-radius: 1rem; background: color-mix(in srgb, var(--card-bg) 84%, var(--page-bg)); }
+	.album-form-title { display: flex; align-items: center; gap: .7rem; color: var(--primary); font-size: 1.55rem; }
+	.album-form-title h3 { color: var(--text-90); font-size: 1rem; font-weight: 800; }
+	.album-form-title p { color: var(--text-50); font-size: .75rem; }
+	.album-file input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+	.album-file span { min-height: 7rem; display: grid; place-items: center; align-content: center; gap: .45rem; border: 1px dashed color-mix(in srgb, var(--primary) 45%, var(--line-divider)); border-radius: 1rem; color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, transparent); cursor: pointer; }
+	.album-photos { margin-top: 1rem; }
+	.gallery-masonry { column-count: 3; column-gap: .9rem; }
+	.album-photo { position: relative; break-inside: avoid; margin-bottom: .9rem; }
+	.album-photo :global(.gallery-photo-card) { margin-bottom: 0; }
+	.album-photo :global(.gallery-photo-card > div) { border: 1px solid color-mix(in srgb, var(--line-divider) 70%, transparent); box-shadow: 0 8px 28px rgba(0,0,0,.1); }
+	.photo-delete { position: absolute; top: .6rem; right: .6rem; z-index: 3; opacity: 0; transform: translateY(-3px); transition: .2s ease; }
+	.album-photo:hover .photo-delete, .photo-delete:focus-within { opacity: 1; transform: none; }
+	.photo-delete button { width: 2rem; height: 2rem; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.25); border-radius: .65rem; color: white; background: rgba(20,20,24,.5); backdrop-filter: blur(10px); cursor: pointer; }
+	.photo-delete button:hover { background: #dc2626; }
+	.album-empty { padding: clamp(3rem, 8vw, 6rem) 1.5rem; text-align: center; }
+	.album-empty > :global(svg) { margin: 0 auto 1rem; color: var(--primary); font-size: 3.5rem; }
+	.album-empty h2 { font-size: 1.25rem; font-weight: 800; }
+	.album-empty p { margin-top: .4rem; opacity: .6; }
+	@media (max-width: 900px) { .gallery-masonry { column-count: 2; } }
+	@media (max-width: 560px) { .album-heading { align-items: flex-start; } .album-count { width: 4rem; height: 4rem; border-radius: 1.15rem; } .gallery-masonry { column-count: 1; } .photo-delete { opacity: 1; transform: none; } }
+</style>

@@ -75,13 +75,69 @@ const albums = await query<{
 );
 ---
 
-<MainGridLayout title="共享相册" description="登录用户都可以创建相册、上传和管理图片。">
-	<section class="card-base community-card">
-		<div class="community-actions" style="justify-content:space-between"><div><h1 class="text-3xl font-bold">共享相册</h1><p class="community-muted">图片保存在腾讯云服务器，所有登录用户共同维护。</p></div>{!user && <a class="community-button primary" href="/login/?returnTo=%2Fgallery%2F">登录后管理</a>}</div>
-		{notice && <p class="community-alert mt-4">{notice}</p>}{error && <p class="community-alert error mt-4">{error}</p>}
-		{user && <details class="mt-5"><summary class="community-button primary inline-block cursor-pointer"><Icon is:inline name="material-symbols:add-photo-alternate-outline"/> 新建相册</summary><form method="post" class="community-form mt-4"><input type="hidden" name="action" value="create"/><label>相册名称<input name="name" maxlength="100" required/></label><label>英文地址<input name="slug" maxlength="80" pattern="[a-zA-Z0-9-]+" placeholder="summer-2026" required/></label><label>描述<input name="description" maxlength="500"/></label><div class="community-grid"><label>地点<input name="location" maxlength="120"/></label><label>日期<input name="date" type="date"/></label></div><label>标签（用英文逗号分隔）<input name="tags" maxlength="500"/></label><button class="community-button primary">创建相册</button></form></details>}
+<MainGridLayout title="相册" description="留下美好">
+	<section class="card-base gallery-hero">
+		<div class="gallery-hero-icon"><Icon is:inline name="material-symbols:photo-library-outline-rounded" /></div>
+		<div class="gallery-hero-copy">
+			<span class="gallery-eyebrow">MEMORIES</span>
+			<h1>相册</h1>
+			<p>留下美好</p>
+		</div>
+		{!user && <a class="gallery-action primary" href="/login/?returnTo=%2Fgallery%2F"><Icon is:inline name="material-symbols:login-rounded" /> 登录后管理</a>}
+		{user && <details class="gallery-create">
+			<summary class="gallery-action primary"><Icon is:inline name="material-symbols:add-photo-alternate-outline" /> 新建相册</summary>
+			<div class="gallery-create-panel">
+				<div class="gallery-form-heading"><Icon is:inline name="material-symbols:collections-bookmark-outline-rounded" /><div><strong>创建新相册</strong><span>为这一段记忆取个名字</span></div></div>
+				<form method="post" class="community-form gallery-form">
+					<input type="hidden" name="action" value="create" />
+					<div class="community-grid"><label>相册名称<input name="name" maxlength="100" placeholder="例如：夏日旅行" required /></label><label>英文地址<input name="slug" maxlength="80" pattern="[a-zA-Z0-9-]+" placeholder="summer-2026" required /></label></div>
+					<label>一句描述<input name="description" maxlength="500" placeholder="写下这组照片的故事" /></label>
+					<div class="community-grid"><label>地点<input name="location" maxlength="120" placeholder="在哪里拍下的" /></label><label>日期<input name="date" type="date" /></label></div>
+					<label>标签<input name="tags" maxlength="500" placeholder="旅行, 日常, 朋友" /></label>
+					<div><button class="gallery-action primary"><Icon is:inline name="material-symbols:check-rounded" /> 创建相册</button></div>
+				</form>
+			</div>
+		</details>}
 	</section>
-	<section class="card-base community-card">
-		{albums.rows.length ? <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{albums.rows.map((album) => <div><AlbumCard id={album.slug} name={album.name} cover={album.cover_id ? `/api/gallery/photos/${album.cover_id}` : ""} description={album.description} date={album.album_date || undefined} location={album.location} tags={album.tags.split(",").map((tag) => tag.trim()).filter(Boolean)} photoCount={album.photo_count}/>{user && <form method="post" class="mt-2" onsubmit="return confirm('确定删除整个相册吗？')"><input type="hidden" name="action" value="delete"/><input type="hidden" name="albumId" value={album.id}/><button class="community-button">删除相册</button></form>}</div>)}</div> : <p class="community-muted">还没有相册，登录后创建第一个吧。</p>}
+	{notice && <p class="community-alert gallery-notice">{notice}</p>}{error && <p class="community-alert error gallery-notice">{error}</p>}
+	<section class="gallery-content">
+		{albums.rows.length ? <div class="gallery-album-grid">{albums.rows.map((album) => <article class="gallery-album-item"><AlbumCard id={album.slug} name={album.name} cover={album.cover_id ? `/api/gallery/photos/${album.cover_id}` : ""} description={album.description} date={album.album_date || undefined} location={album.location} tags={album.tags.split(",").map((tag) => tag.trim()).filter(Boolean)} photoCount={album.photo_count}/>{user && <form method="post" class="gallery-delete-form" onsubmit="return confirm('确定删除整个相册吗？')"><input type="hidden" name="action" value="delete"/><input type="hidden" name="albumId" value={album.id}/><button aria-label={`删除相册 ${album.name}`} title="删除相册"><Icon is:inline name="material-symbols:delete-outline-rounded" /></button></form>}</article>)}</div> : <div class="card-base gallery-empty"><div class="gallery-empty-icon"><Icon is:inline name="material-symbols:add-photo-alternate-outline-rounded" /></div><h2>第一段美好，等待被收藏</h2><p>{user ? "新建一个相册，上传值得记住的瞬间。" : "登录后就可以创建第一个相册。"}</p></div>}
 	</section>
 </MainGridLayout>
+
+<style>
+	.gallery-hero { position: relative; display: flex; align-items: center; gap: 1.2rem; padding: clamp(1.4rem, 4vw, 2.2rem); overflow: visible; background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 13%, var(--card-bg)) 0%, var(--card-bg) 62%); }
+	.gallery-hero::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit; background: radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--primary) 20%, transparent), transparent 36%); }
+	.gallery-hero > * { position: relative; z-index: 1; }
+	.gallery-hero-icon { width: 4.25rem; height: 4.25rem; flex: none; display: grid; place-items: center; border-radius: 1.35rem; font-size: 2rem; color: white; background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 82%, white), var(--primary)); box-shadow: 0 12px 30px color-mix(in srgb, var(--primary) 25%, transparent); transform: rotate(-3deg); }
+	.gallery-hero-copy { flex: 1; min-width: 0; }
+	.gallery-eyebrow { color: var(--primary); font-size: .68rem; font-weight: 850; letter-spacing: .2em; }
+	.gallery-hero h1 { margin: .1rem 0; font-size: clamp(2rem, 5vw, 3rem); font-weight: 850; line-height: 1.08; }
+	.gallery-hero p { opacity: .62; font-size: 1rem; }
+	.gallery-action { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; padding: .7rem 1rem; border: 0; border-radius: .85rem; background: var(--btn-plain-bg-hover); color: inherit; font-weight: 720; cursor: pointer; transition: transform .2s ease, box-shadow .2s ease, background .2s ease; }
+	.gallery-action:hover { transform: translateY(-2px); }
+	.gallery-action.primary { color: white; background: var(--primary); box-shadow: 0 8px 22px color-mix(in srgb, var(--primary) 24%, transparent); }
+	.gallery-create { flex: none; }
+	.gallery-create summary { list-style: none; }
+	.gallery-create summary::-webkit-details-marker { display: none; }
+	.gallery-create-panel { position: absolute; top: calc(100% + .8rem); right: 0; z-index: 30; width: min(34rem, calc(100vw - 2rem)); padding: 1.25rem; border: 1px solid var(--line-divider); border-radius: 1.2rem; background: color-mix(in srgb, var(--card-bg) 94%, transparent); box-shadow: 0 24px 60px rgba(0,0,0,.18); backdrop-filter: blur(20px); }
+	.gallery-form-heading { display: flex; gap: .8rem; align-items: center; margin-bottom: 1rem; color: var(--primary); font-size: 1.6rem; }
+	.gallery-form-heading div { display: grid; }
+	.gallery-form-heading strong { color: var(--text-90); font-size: 1rem; }
+	.gallery-form-heading span { color: var(--text-50); font-size: .78rem; }
+	.gallery-form input { background: color-mix(in srgb, var(--card-bg) 80%, var(--page-bg)); }
+	.gallery-notice { margin-top: 1rem; }
+	.gallery-content { margin-top: 1rem; }
+	.gallery-album-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 1.1rem; }
+	.gallery-album-item { position: relative; min-width: 0; }
+	.gallery-album-item :global(.album-card) { border: 1px solid color-mix(in srgb, var(--line-divider) 75%, transparent); box-shadow: 0 8px 28px rgba(0,0,0,.08); }
+	.gallery-delete-form { position: absolute; top: .65rem; left: .65rem; z-index: 4; opacity: 0; transform: translateY(-3px); transition: .2s ease; }
+	.gallery-album-item:hover .gallery-delete-form, .gallery-delete-form:focus-within { opacity: 1; transform: none; }
+	.gallery-delete-form button { width: 2rem; height: 2rem; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.25); border-radius: .65rem; color: white; background: rgba(20,20,24,.48); backdrop-filter: blur(10px); cursor: pointer; }
+	.gallery-delete-form button:hover { background: #dc2626; }
+	.gallery-empty { padding: clamp(3rem, 8vw, 6rem) 1.5rem; text-align: center; }
+	.gallery-empty-icon { width: 5rem; height: 5rem; margin: 0 auto 1rem; display: grid; place-items: center; border-radius: 50%; color: var(--primary); font-size: 2.2rem; background: color-mix(in srgb, var(--primary) 12%, var(--card-bg)); }
+	.gallery-empty h2 { font-size: 1.25rem; font-weight: 800; }
+	.gallery-empty p { margin-top: .4rem; opacity: .6; }
+	@media (max-width: 640px) { .gallery-hero { align-items: flex-start; flex-wrap: wrap; } .gallery-hero-icon { width: 3.4rem; height: 3.4rem; border-radius: 1rem; font-size: 1.65rem; } .gallery-hero-copy { width: calc(100% - 4.6rem); } .gallery-create, .gallery-hero > .gallery-action { width: 100%; } .gallery-create summary, .gallery-hero > .gallery-action { width: 100%; } .gallery-create-panel { position: relative; top: .8rem; width: 100%; } .gallery-delete-form { opacity: 1; transform: none; } }
+</style>
