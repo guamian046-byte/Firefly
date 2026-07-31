@@ -68,14 +68,13 @@ jobs:
             "$SERVER_USER@$SERVER_HOST" "bash -s -- '$GITHUB_SHA'" <<'REMOTE'
           set -euo pipefail
           revision="$1"
-          source_dir="/var/www/guamian/source"
-          if [ ! -d "$source_dir/.git" ]; then
-            if [ -e "$source_dir" ]; then
-              mv "$source_dir" "$source_dir.incomplete.$(date +%Y%m%d%H%M%S)"
-            fi
-            git clone --depth=1 --no-tags https://github.com/guamian046-byte/Firefly.git "$source_dir"
-          fi
-          git -C "$source_dir" fetch --depth=1 origin "$revision"
-          git -C "$source_dir" checkout --force --detach FETCH_HEAD
-          bash "$source_dir/deploy/deploy-from-git.sh"
+          source_dir="/var/www/guamian/sources/$revision"
+          archive="/tmp/firefly-$revision.tar.gz"
+          install -d -m 755 "$source_dir"
+          curl --fail --location --retry 3 --connect-timeout 20 \
+            "https://github.com/guamian046-byte/Firefly/archive/$revision.tar.gz" \
+            --output "$archive"
+          tar -xzf "$archive" --strip-components=1 -C "$source_dir"
+          rm -f "$archive"
+          bash "$source_dir/deploy/deploy-from-git.sh" "$source_dir"
           REMOTE

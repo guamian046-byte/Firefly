@@ -2,10 +2,9 @@
 set -euo pipefail
 
 deploy_root="/var/www/guamian"
-source_dir="$deploy_root/source"
+source_dir="${1:-$deploy_root/source}"
 release="$deploy_root/releases/$(date +%Y%m%d%H%M%S)"
 
-command -v git >/dev/null
 command -v node >/dev/null
 command -v pnpm >/dev/null
 
