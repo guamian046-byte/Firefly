@@ -45,7 +45,7 @@ jobs:
           SERVER_HOST_KEY: ${{ secrets.SERVER_HOST_KEY }}
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s' "$SSH_PRIVATE_KEY" | base64 --decode > ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$SERVER_HOST_KEY" > ~/.ssh/known_hosts
 
