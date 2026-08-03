@@ -1,5 +1,7 @@
+import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
 import type { APIRoute } from "astro";
 import { query } from "@/lib/server/db";
 
@@ -16,11 +18,15 @@ export const GET: APIRoute = async ({ params }) => {
 	).rows[0];
 	if (!photo) return new Response("图片不存在", { status: 404 });
 	try {
-		const bytes = await fs.readFile(path.join(uploadRoot, photo.id));
-		return new Response(bytes, {
+		const filePath = path.join(uploadRoot, photo.id);
+		const stat = await fs.stat(filePath);
+		const stream = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
+		return new Response(stream, {
 			headers: {
 				"content-type": photo.content_type,
+				"content-length": String(stat.size),
 				"cache-control": "public, max-age=31536000, immutable",
+				"x-content-type-options": "nosniff",
 			},
 		});
 	} catch {

@@ -132,9 +132,59 @@ const photos = await query<{
 		<div class="album-meta">{album.album_date && <span><Icon is:inline name="material-symbols:calendar-month-outline-rounded" /> {album.album_date}</span>}{album.location && <span><Icon is:inline name="material-symbols:location-on-outline-rounded" /> {album.location}</span>}{album.tags.split(",").map((tag) => tag.trim()).filter(Boolean).map((tag) => <span class="album-tag">#{tag}</span>)}</div>
 	</section>
 	{notice && <p class="community-alert album-notice">{notice}</p>}{error && <p class="community-alert error album-notice">{error}</p>}
-	{user && <details class="card-base album-manager"><summary><Icon is:inline name="material-symbols:tune-rounded" /> 管理相册</summary><div class="community-grid album-manager-grid"><form method="post" enctype="multipart/form-data" class="community-form album-upload"><input type="hidden" name="action" value="upload"/><div class="album-form-title"><Icon is:inline name="material-symbols:cloud-upload-outline-rounded" /><div><h3>添加照片</h3><p>单张不超过 8MB，最多选择 20 张</p></div></div><label class="album-file"><input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple required/><span><Icon is:inline name="material-symbols:add-photo-alternate-outline-rounded" /> 选择照片</span></label><button class="community-button primary">上传所选图片</button></form><form method="post" class="community-form"><input type="hidden" name="action" value="update"/><div class="album-form-title"><Icon is:inline name="material-symbols:edit-note-rounded" /><div><h3>相册资料</h3><p>完善这段记忆的信息</p></div></div><label>名称<input name="name" value={album.name} required/></label><label>描述<input name="description" value={album.description}/></label><div class="community-grid"><label>地点<input name="location" value={album.location}/></label><label>日期<input type="date" name="date" value={album.album_date || ""}/></label></div><label>标签<input name="tags" value={album.tags}/></label><button class="community-button">保存资料</button></form></div></details>}
+	{user && <details class="card-base album-manager"><summary><Icon is:inline name="material-symbols:tune-rounded" /> 管理相册</summary><div class="community-grid album-manager-grid"><form method="post" enctype="multipart/form-data" class="community-form album-upload" data-gallery-upload data-album-id={album.id}><input type="hidden" name="action" value="upload"/><div class="album-form-title"><Icon is:inline name="material-symbols:cloud-upload-outline-rounded" /><div><h3>添加照片</h3><p>单张不超过 8MB，最多选择 20 张；系统会逐张上传</p></div></div><label class="album-file"><input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple required/><span><Icon is:inline name="material-symbols:add-photo-alternate-outline-rounded" /> 选择照片</span></label><p class="community-muted text-sm" data-upload-status aria-live="polite"></p><progress data-upload-progress value="0" max="100" class="w-full hidden"></progress><button class="community-button primary" data-upload-button>上传所选图片</button></form><form method="post" class="community-form"><input type="hidden" name="action" value="update"/><div class="album-form-title"><Icon is:inline name="material-symbols:edit-note-rounded" /><div><h3>相册资料</h3><p>完善这段记忆的信息</p></div></div><label>名称<input name="name" value={album.name} required/></label><label>描述<input name="description" value={album.description}/></label><div class="community-grid"><label>地点<input name="location" value={album.location}/></label><label>日期<input type="date" name="date" value={album.album_date || ""}/></label></div><label>标签<input name="tags" value={album.tags}/></label><button class="community-button">保存资料</button></form></div></details>}
 	<section class="album-photos">{photos.rows.length ? <div class="gallery-masonry">{photos.rows.map((photo) => <article class="album-photo"><PhotoCard src={`/api/gallery/photos/${photo.id}`} albumId={album.slug} alt={photo.file_name}/>{user && <form method="post" class="photo-delete" onsubmit="return confirm('确定删除这张图片吗？')"><input type="hidden" name="action" value="delete-photo"/><input type="hidden" name="photoId" value={photo.id}/><button aria-label={`删除图片 ${photo.file_name}`} title="删除图片"><Icon is:inline name="material-symbols:delete-outline-rounded" /></button></form>}</article>)}</div> : <div class="card-base album-empty"><Icon is:inline name="material-symbols:photo-library-outline-rounded" /><h2>这里还没有照片</h2><p>{user ? "打开管理相册，上传第一张美好。" : "等待美好被收藏。"}</p></div>}</section>
 </MainGridLayout>
+
+<script>
+	function initGalleryUpload() {
+		const form = document.querySelector<HTMLFormElement>("[data-gallery-upload]");
+		if (!form || form.dataset.ready === "true") return;
+		form.dataset.ready = "true";
+		form.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			const input = form.querySelector<HTMLInputElement>('input[type="file"]');
+			const button = form.querySelector<HTMLButtonElement>("[data-upload-button]");
+			const status = form.querySelector<HTMLElement>("[data-upload-status]");
+			const progress = form.querySelector<HTMLProgressElement>("[data-upload-progress]");
+			const files = Array.from(input?.files || []).slice(0, 20);
+			if (!files.length || !button || !status || !progress) return;
+
+			button.disabled = true;
+			progress.classList.remove("hidden");
+			let uploaded = 0;
+			const failures: string[] = [];
+			for (const file of files) {
+				status.textContent = `正在上传 ${uploaded + failures.length + 1}/${files.length}：${file.name}`;
+				const body = new FormData();
+				body.append("photo", file);
+				try {
+					const response = await fetch(
+						`/api/gallery/albums/${form.dataset.albumId}/photos`,
+						{ method: "POST", body },
+					);
+					const result = await response.json();
+					if (!response.ok) throw new Error(result.error || "上传失败");
+					uploaded += 1;
+				} catch (cause) {
+					failures.push(`${file.name}：${cause instanceof Error ? cause.message : "上传失败"}`);
+				}
+				progress.value = ((uploaded + failures.length) / files.length) * 100;
+			}
+
+			if (failures.length) {
+				status.textContent = `已上传 ${uploaded} 张，失败 ${failures.length} 张。${failures.join("；")}`;
+				button.disabled = false;
+			} else {
+				status.textContent = `成功上传 ${uploaded} 张图片，正在刷新相册…`;
+				window.location.reload();
+			}
+		});
+	}
+
+	initGalleryUpload();
+	document.addEventListener("astro:page-load", initGalleryUpload);
+</script>
 
 <style>
 	.album-hero { padding: clamp(1.35rem, 4vw, 2.2rem); background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 11%, var(--card-bg)), var(--card-bg) 62%); }
